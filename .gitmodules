@@ -1,0 +1,3 @@
+[submodule "compiler-tests"]
+	path = compiler-tests
+	url = https://github.com/anlun/compiler-tests
