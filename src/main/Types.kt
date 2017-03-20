@@ -5,21 +5,39 @@ import java.lang.Math.pow
 // Data
 /////////////////////////////
 
-typealias Program = List<Statement>
+class Program(var stmts: List<Statement>) {
+    override fun toString(): String {
+        val progText = StringBuilder()
+        stmts.forEach { progText.append(it.toString() + ";\n") }
+        return progText.toString().removeSuffix(";\n")
+    }
+}
 
 sealed class Statement {
-    class Assignment(val left: Expression.Var, val right: Expression): Statement()
-    class WriteLn(val arg: Expression): Statement()
+    class Assignment(val left: Expression.Var, val right: Expression): Statement() {
+        override fun toString() = "$left := $right"
+    }
+
+    class WriteLn(val arg: Expression): Statement() {
+        override fun toString() = "write($arg)"
+    }
+
+    class IfElse(val cond: Expression, val trueAct: Program, val falseAct: Program): Statement() {
+        override fun toString() = "if ($cond)\nthen $trueAct\nelse $falseAct\nfi"
+    }
 }
 
 sealed class Expression {
     class Const(val value: Int): Expression() {
         override fun eval(env: Map<Var, Int>) = value
+        override fun toString() = "$value"
     }
 
     class Var(val name: String): Expression() {
         override fun eval(env: Map<Var, Int>)
                 = env[this] ?: throw IllegalArgumentException("Unknown variable $name")
+
+        override fun toString() = name
     }
 
     class BinOper(val oper: String, val left: Expression, val right: Expression): Expression() {
@@ -36,6 +54,8 @@ sealed class Expression {
                 else -> throw IllegalArgumentException("Not supported operation")
             }
         }
+
+        override fun toString() = "$left $oper $right"
     }
 
     class CompOper(val oper: String, val left: Expression, val right: Expression): Expression() {
@@ -52,6 +72,8 @@ sealed class Expression {
                 else -> throw IllegalArgumentException("Not supported comparison")
             }) 1 else 0
         }
+
+        override fun toString() = "$left $oper $right"
     }
 
     object ReadLn: Expression() {
@@ -59,6 +81,8 @@ sealed class Expression {
             print("> ")
             return readLine()?.toInt() ?: throw IllegalArgumentException("Expected Int for read")
         }
+
+        override fun toString() = "read()"
     }
 
     override fun hashCode(): Int = when (this) {
@@ -76,7 +100,8 @@ sealed class Expression {
             is Var -> return this is Var && name == other.name
             is BinOper -> return this is BinOper && oper == other.oper && left == other.left && right == other.right
             is CompOper -> return this is CompOper && oper == other.oper && left == other.left && right == other.right
-            ReadLn -> return this is ReadLn
+            is ReadLn -> return this is ReadLn
+            else -> throw IllegalArgumentException("Something with equals")
         }
     }
 
@@ -93,47 +118,70 @@ fun litPars(lit: String, vararg lits: String) : Parser<String> {
     return sp(p)
 }
 
-val varP: Parser<Expression.Var> = sp(symbol) map { Expression.Var(it) }
 val varEP: Parser<Expression> = sp(symbol) map { Expression.Var(it) }
 
 fun exprP(): Parser<Expression> = fix {
-    val exprPbase: Parser<Expression> =
+    val basicExprP: Parser<Expression> =
             (number map { Expression.Const(it) as Expression }) /
-            (litp("read()") map { Expression.ReadLn }) /
+            (litPars("read()") map { Expression.ReadLn }) /
             varEP /
             paren(sp(it))
 
-    val prior1 = rightAssocp(litPars("^"), exprPbase )
+    val prior1 = rightAssocp(litPars("^"), basicExprP )
                 { oper, l, r -> Expression.BinOper(oper, l, r) }
     val prior2 = leftAssocp(litPars("*", "/", "%"), prior1 )
                 { oper, l, r -> Expression.BinOper(oper, l, r) }
     val prior3 = leftAssocp(litPars("+", "-"), prior2 )
                 { oper, l, r -> Expression.BinOper(oper, l, r) }
-    val prior4 = leftAssocp(litPars("==", "!=", "<", ">", "<=", ">="), prior3 ) // TODO: всего одни раз
+
+    return@fix prior3
+}
+
+val exprPar = leftAssocp(litPars("==", "!=", "<", ">", "<=", ">="), exprP() )
                 { oper, l, r -> Expression.CompOper(oper, l, r) }
-    return@fix prior4
+
+infix fun <A> Parser<A>.sepBy(sep: Parser<String>): Parser<List<A>> {
+    return this + many0(sep seqr this) map { (fst, rest) -> listOf(fst) + rest}
 }
 
-val stmtP: Parser<Statement> =
-    ((varP seql litPars(":=")) + exprP() map { (left, right) -> Statement.Assignment(left, right) as Statement }) /
-    (litp("write") seqr sp(paren(sp(exprP()))) map { arg -> Statement.WriteLn(arg) })
+fun stmtP(): Parser<Statement> = fix {
+    val basicStmtP: Parser<Statement> =
+            ((varEP seql litPars(":=")) + (exprPar)  map { (left, right) -> Statement.Assignment(left as Expression.Var, right) as Statement }) /
+                    (litp("write") seqr sp(paren(sp(exprPar)))  map { arg -> Statement.WriteLn(arg) })
 
-fun parseProgram(text: List<String>): Program {
+    val ifStmtP =
+            (litPars("if") seqr exprP()) +
+            (litPars("then") seqr (it sepBy litPars(";"))) +
+            (litPars("else") seqr (it sepBy litPars(";")) seql litPars("fi")) map { (t, f) -> Statement.IfElse(t.first, Program(t.second), Program(f)) as Statement }
+
+    return@fix basicStmtP / ifStmtP
+}
+
+val stPar: Parser<List<Statement>> = stmtP() sepBy litPars(";")
+
+fun parseProgram(text: String): Program {
     val program = mutableListOf<Statement>()
-    for (line in text) {
-        line.split(";").filter { it != "" }.forEach { // TODO: использовать parser combinators
-            val statement = stmtP.get(it) ?: throw IllegalArgumentException("Invalid statement: $line")
-            program.add(statement)
-        }
-    }
-    return program
+    val statement = stPar.get(text) ?: throw IllegalArgumentException("Invalid statement: $text")
+    statement.forEach { program.add(it) }
+
+    return Program(program)
 }
 
-fun interpretProgram(program: Program) {
-    val variables = hashMapOf<Expression.Var, Int>()
+fun interpretProgram(program: Program, globalVariables: HashMap<Expression.Var, Int> = hashMapOf<Expression.Var, Int>()) {
+    val localVariables = HashMap<Expression.Var, Int>(globalVariables)
 
-    for (statement in program) when (statement) {
-        is Statement.Assignment -> variables.put(statement.left, statement.right.eval(variables))
-        is Statement.WriteLn -> println(statement.arg.eval(variables))
+    program.stmts.forEach {
+        val stmt: Statement? = it
+        when (stmt) {
+            is Statement.IfElse ->
+                interpretProgram(if (stmt.cond.eval(localVariables) == 1) stmt.trueAct else stmt.falseAct, localVariables)
+            is Statement.Assignment ->
+                localVariables.put(stmt.left, stmt.right.eval(localVariables))
+            is Statement.WriteLn ->
+                println(">> ${stmt.arg.eval(localVariables)}")
+        }
+
     }
+    globalVariables.putAll(localVariables.filter { globalVariables.contains(it.key) })
+
 }
