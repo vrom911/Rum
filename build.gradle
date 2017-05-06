@@ -11,9 +11,12 @@ buildscript {
     }
 }
 
+logging.captureStandardOutput LogLevel.QUIET
+
 apply plugin: 'idea'
 apply plugin: 'java'
 apply plugin: 'kotlin'
+apply plugin: 'application'
 
 sourceCompatibility = 1.5
 
@@ -45,4 +48,19 @@ idea.module {
     name = "Compiler"
     sourceDirs += file('src/main')
     testSourceDirs += file('src/test')
+}
+
+mainClassName = "ru.ctddev.romashkina.compiler.ExprKt"
+
+run {
+    /* Can pass all the properties: */
+    systemProperties System.getProperties()
+
+    /* Or just each by name: */
+    systemProperty "myvariable", System.getProperty("myvariable")
+
+    /* Need to split the space-delimited value in the exec.args */
+    args System.getProperty("exec.args").split()
+
+    standardInput = System.in
 }
