@@ -2,13 +2,13 @@ name:                Compiler
 version:             0.1.0.0
 -- synopsis:
 -- description:
-homepage:            https://github.com/githubuser/Compiler#readme
+homepage:            https://github.com/vrom911/Compiler#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Veronika Romashkina
-maintainer:          example@example.com
+maintainer:          vrom911@gmail.com
 copyright:           2017 vrom911
-category:            Web
+category:            Compiler
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
@@ -25,6 +25,7 @@ library
                      , mtl
                      , unordered-containers
   default-language:    Haskell2010
+  ghc-options:         -Wall
 
 executable Compiler
   hs-source-dirs:      app
@@ -35,6 +36,7 @@ executable Compiler
                      , megaparsec
                      , mtl
   default-language:    Haskell2010
+  ghc-options:         -Wall
 
 test-suite Compiler-test
   type:                exitcode-stdio-1.0
@@ -49,4 +51,4 @@ test-suite Compiler-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/Compiler
+  location: https://github.com/vrom911/Compiler

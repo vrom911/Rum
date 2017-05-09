@@ -1,0 +1,28 @@
+sudo: required
+
+language: c
+
+cache:
+  directories:
+  - "$HOME/.stack"
+  - "$HOME/build/vrom911/Compiler/.stack-work"
+
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+
+before_install:
+  # Download and unpack the stack executable
+  - mkdir -p ~/.local/bin
+  - export PATH=$HOME/.local/bin:$PATH
+  - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+
+install:
+  - stack --version
+  - stack -j 2 setup --no-terminal
+  - stack ghc -- --version
+  - stack -j 2 build --test --only-snapshot --no-terminal
+
+script:
+  - stack --jobs=4 build --test --no-terminal
