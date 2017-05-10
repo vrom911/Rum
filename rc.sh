@@ -1,0 +1,1 @@
+stack exec -- Compiler $1 $2
