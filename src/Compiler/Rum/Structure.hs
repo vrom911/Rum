@@ -7,10 +7,9 @@ module Compiler.Rum.Structure where
 import           Data.Bool (bool)
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable              (Hashable)
-import           Control.Monad.Reader
+import           Control.Monad.State
 import           Control.Applicative        (liftA2)
 import           Text.Read                  (readMaybe)
-import           System.IO.Unsafe
 
 type Program = [Statement]
 
@@ -18,7 +17,7 @@ data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
 
 data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show)
 
-data LogicOp = And | Or deriving (Show)
+data LogicOp = And | Or | Xor deriving (Show)
 
 newtype Variable = Variable {name :: String} deriving (Show, Eq, Ord, Hashable)
 
@@ -42,13 +41,27 @@ data Statement = Assignment  {var :: Variable, value :: Expression}
 
 type Environment = HM.HashMap Variable Int
 
-binOp :: (Integral a) => BinOp -> (a -> a -> a)
+binOp :: BinOp -> (Int -> Int -> Int)
 binOp Add = (+)
 binOp Sub = (-)
 binOp Mul = (*)
-binOp Div = div
-binOp Mod = mod
+binOp Div = div'
+binOp Mod = mod'
 binOp Pow = (^)
+
+-- For expressions tests
+div' :: Int -> Int -> Int
+div' x y =
+    case signum x == negate (signum y) of
+        True ->
+            if absx < absy
+                then 0
+                else negate $ div absx absy
+            where (absx, absy) = (abs x, abs y)
+        False -> div x y
+
+mod' :: Int -> Int -> Int
+mod' x y = signum x * mod (abs x) (abs y)
 
 compOp :: Ord a => CompOp -> a -> a -> Bool
 compOp Eq    = (==)
@@ -61,6 +74,7 @@ compOp NotLt = (>=)
 logicOp :: LogicOp -> Int -> Int -> Int
 logicOp And = (<&>)
 logicOp Or  = (-|-)
+logicOp Xor = (-!-)
 
 (<&>) :: Int -> Int -> Int
 0 <&> _ = 0
@@ -71,16 +85,20 @@ _ <&> _ = 1
 0 -|- 0 = 0
 _ -|- _ = 1
 
-eval :: Expression -> Reader Environment (Maybe Int)
+-- hack till idk the operator meaning
+(-!-) :: Int -> Int -> Int
+(-!-) = (-|-)
+
+eval :: Expression -> StateT Environment IO (Maybe Int)
 eval (Const c)     = pure (Just c)
-eval (Var v)       = asks (HM.lookup v)
+eval (Var v)       = gets (HM.lookup v)
 eval (Neg e)       = (negate <$>) <$> eval e
-eval BinOper{..}   = liftA2 (liftA2 (binOp bop))   (eval l) (eval r)
-eval LogicOper{..} = liftA2 (liftA2 (logicOp lop)) (eval l) (eval r)
-eval CompOper{..}  = liftA2 (liftA2 intCompare) (eval l) (eval r)
+eval BinOper{..}   = liftA2 (liftA2 $ binOp bop)   (eval l) (eval r)
+eval LogicOper{..} = liftA2 (liftA2 $ logicOp lop) (eval l) (eval r)
+eval CompOper{..}  = liftA2 (liftA2 intCompare)    (eval l) (eval r)
   where
     intCompare :: Int -> Int -> Int
     intCompare x y = bool 0 1 $ compOp cop x y
-eval ReadLn        = return $ unsafePerformIO (do
-                        input <- getLine
-                        return $ readMaybe input)
+eval ReadLn        = do
+    input <- lift getLine
+    return $ readMaybe input

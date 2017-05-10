@@ -30,7 +30,7 @@ numP = (read <$> some digitChar) <* space
 
 varNameP :: Parser Variable
 varNameP = Variable <$> ((((:) <$> (try (oneOf "_$") <|> letterChar)
-                        <*> many (try alphaNumChar <|> oneOf "_-$")) >>= \x -> if x `elem` keyWords
+                        <*> many (try alphaNumChar <|> oneOf "_$")) >>= \x -> if x `elem` keyWords
                         then fail "Can not use Key words as variable names"
                         else pure x
                         ) <* space)
@@ -59,6 +59,7 @@ aOperators =
     ]
   , [ InfixL (LogicOper And <$ strSpace "&&")
     , InfixL (LogicOper Or  <$ strSpace "||")
+    , InfixL (LogicOper Xor <$ strSpace "!!")
     ]
   ]
 

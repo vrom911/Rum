@@ -66,3 +66,4 @@ cToStr NotLt = " >= "
 lToStr :: LogicOp -> String
 lToStr And = " && "
 lToStr Or  = " || "
+lToStr Xor = " !! "
