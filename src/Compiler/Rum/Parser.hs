@@ -58,7 +58,8 @@ aOperators =
     , InfixN (CompOper Gt    <$ strSpace ">")
     ]
   , [ InfixL (LogicOper And <$ strSpace "&&")
-    , InfixL (LogicOper Or  <$ strSpace "||")
+    ]
+  , [ InfixL (LogicOper Or  <$ strSpace "||")
     , InfixL (LogicOper Xor <$ strSpace "!!")
     ]
   ]
