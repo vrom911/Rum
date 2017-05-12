@@ -1,22 +1,22 @@
 module Main where
 
 import Control.Monad.State
-import System.Environment   (getArgs)
-import Text.Megaparsec      (parse)
-
+import Control.Monad.Trans.Maybe
+import System.Environment        (getArgs)
+import Text.Megaparsec           (parse)
 
 import Compiler.Rum.Interpreter
 import Compiler.Rum.Parser
-import Compiler.Rum.Structure (Statement)
+import Compiler.Rum.Structure
 import Compiler.Rum.ToString
 
 main :: IO ()
 main = do
-    l@(opt:args) <- getArgs  -- [opt, file] <- getArgs
+    progArgs@(opt:cmdArgs) <- getArgs  -- [opt, file] <- getArgs
     case opt of
         "-t" -> run "prog.expr" test
-        "-i" -> run (head args) interpr
-        _    -> print l
+        "-i" -> run (head cmdArgs) interpr
+        _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
 run fileName f = do
@@ -29,8 +29,9 @@ run fileName f = do
 test :: [Statement] -> IO ()
 test p = do
     print p
-    evalStateT (interpret p) mempty
+    let mt = evalStateT (interpret p) (Env mempty mempty False)
+    () <$ runMaybeT mt
     putStrLn $ progToStr 0 p
 
 interpr :: [Statement] -> IO ()
-interpr p = evalStateT (interpret p) mempty
+interpr p = () <$ runMaybeT (evalStateT (interpret p) (Env mempty mempty False))

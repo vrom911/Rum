@@ -32,15 +32,30 @@ stmtToStr n For{..}         = tab n ++ "for " ++ progToStr (succ n) start ++
                               tab n ++ "do"   ++ progToStr (succ n) body ++
                               tab n ++ "od"
 
+stmtToStr n Fun{..}         = tab n ++ "fun " ++ name funName ++ "(" ++ expListStr (Var <$> params) ++ ") begin" ++
+                              progToStr (succ n) funBody ++
+                              tab n ++ "end"
+stmtToStr n Return{..}      = tab n ++ "return " ++ exprToStr retExp
+
 exprToStr :: Expression -> String
-exprToStr (Const c)     = show c
+exprToStr (Const c)     = typeToStr c
 exprToStr (Var v)       = name v
 exprToStr (Neg e)       = "-(" ++ exprToStr e ++ ")"
 exprToStr BinOper{..}   = paren l ++ bToStr bop ++ paren r
 exprToStr LogicOper{..} = paren l ++ lToStr lop ++ paren r
 exprToStr CompOper{..}  = paren l ++ cToStr cop ++ paren r
 exprToStr ReadLn        = "read()"
+exprToStr FunCall{..}   = name fName ++ "(" ++ expListStr args ++ ")"
 
+typeToStr :: Type -> String
+typeToStr (Number n) = show n
+typeToStr (Str s) = s
+typeToStr Unit = "()"
+
+expListStr :: [Expression] -> String
+expListStr [] = ""
+expListStr [x] = exprToStr x
+expListStr (x1:x2:xs) = exprToStr x1 ++", " ++ exprToStr x2 ++ expListStr xs
 
 paren :: Expression -> String
 paren e@(Const _) = exprToStr e

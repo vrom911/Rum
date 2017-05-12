@@ -1,8 +1,7 @@
 module Compiler.Rum.Parser where
 
--- TODO: перенести всё в модуль Compiler
---    * Compiler.Language.Structure
-import Control.Applicative    ((<|>))
+
+import Control.Applicative    ((<|>), liftA2)
 import Text.Megaparsec        ( alphaNumChar, between, char
                               , digitChar, letterChar, many
                               , notFollowedBy, oneOf, option
@@ -19,11 +18,11 @@ strSpace s = string s >>= \x -> space >> return x
 chSpace :: Char -> Parser Char
 chSpace s = char s <* space
 
-kword :: String -> Parser ()
-kword w = string w *> notFollowedBy alphaNumChar *> space
+keyword :: String -> Parser ()
+keyword w = string w *> notFollowedBy alphaNumChar *> space
 
 keyWords :: [String]
-keyWords = ["skip", "write", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for"]
+keyWords = ["skip", "write", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return"]
 
 numP :: Parser Int
 numP = (read <$> some digitChar) <* space
@@ -35,8 +34,17 @@ varNameP = Variable <$> ((((:) <$> (try (oneOf "_$") <|> letterChar)
                         else pure x
                         ) <* space)
 
+paramsP :: Parser [Variable]
+paramsP = varNameP `sepBy` chSpace ','
+
 parens :: Parser a -> Parser a
 parens = between (chSpace '(') (chSpace ')')
+
+funCallP :: Parser Expression
+funCallP = do
+    n <- varNameP
+    e <- parens (exprP `sepBy` chSpace ',')
+    return$ FunCall n e
 
 aOperators :: [[Operator Parser Expression]]
 aOperators =
@@ -66,9 +74,10 @@ aOperators =
 
 basicExprP :: Parser Expression
 basicExprP =   parens arithmeticExprP
-           <|> Const <$> numP
-           <|> ReadLn <$ strSpace "read()"
-           <|> Var <$> varNameP
+           <|> Const . Number <$> numP
+           <|> ReadLn  <$ strSpace "read()"
+           <|> try funCallP
+           <|> Var     <$> varNameP
 
 arithmeticExprP, exprP:: Parser Expression
 arithmeticExprP = makeExprParser basicExprP aOperators
@@ -80,11 +89,11 @@ exprP           = arithmeticExprP
 semiSep :: Parser a -> Parser [a]
 semiSep p = p `sepBy` chSpace ';'
 
-progP :: Parser Program
-progP = space *> semiSep stmtP
+progMainP :: Parser Program
+progMainP = space *> semiSep stmtP
 
 betweenDo :: Parser a -> Parser a
-betweenDo = between (kword "do") (kword "od")
+betweenDo = between (keyword "do") (keyword "od")
 
 stmtP :: Parser Statement
 stmtP =   parens stmtP
@@ -94,6 +103,7 @@ stmtP =   parens stmtP
       <|> repeatP
       <|> whileP
       <|> forP
+      <|> returnP
       <|> assignP
   where
     assignP :: Parser Statement
@@ -104,36 +114,49 @@ stmtP =   parens stmtP
 
     writeP :: Parser Statement
     writeP = do
-        e <- kword "write" *> parens exprP
+        e <- keyword "write" *> parens exprP
         return $ WriteLn e
 
     skipP :: Parser Statement
-    skipP = Skip <$ kword "skip"
+    skipP = Skip <$ keyword "skip"
 
     ifP :: Parser Statement
     ifP = do
-        cond  <- kword "if"   *> exprP
-        true  <- kword "then" *> progP
-        false <- option [Skip] (kword "else" *> progP)
-        ()    <$ kword "fi"
+        cond  <- keyword "if"   *> exprP
+        true  <- keyword "then" *> progMainP
+        false <- option [Skip] (keyword "else" *> progMainP)
+        ()    <$ keyword "fi"
         return $ IfElse cond true false
 
     repeatP :: Parser Statement
     repeatP = do
-        a    <- kword "repeat" *> progP
-        cond <- kword "until"  *> exprP
+        a    <- keyword "repeat" *> progMainP
+        cond <- keyword "until"  *> exprP
         return $ RepeatUntil cond a
 
     whileP :: Parser Statement
     whileP = do
-        cond <- kword "while" *> exprP
-        a    <- betweenDo progP
+        cond <- keyword "while" *> exprP
+        a    <- betweenDo progMainP
         return $ WhileDo cond a
 
     forP :: Parser Statement
     forP = do
-        s <- kword "for" *> progP
+        s <- keyword "for" *> progMainP
         e <- strSpace ","   *> exprP
-        u <- strSpace ","   *> progP
-        b <- betweenDo progP
+        u <- strSpace ","   *> progMainP
+        b <- betweenDo progMainP
         return $ For s e u b
+
+    returnP :: Parser Statement
+    returnP = Return <$> (keyword "return" *> exprP)
+
+funP :: Parser Statement
+funP = do
+    n    <- keyword "fun" *> varNameP
+    prms <- parens paramsP
+    b    <- keyword "begin" *> progMainP <* keyword "end"
+    return $ Fun n prms b
+
+progP :: Parser Program
+progP = liftA2 (++) (space *> many (funP <* space)) progMainP

@@ -1,17 +1,26 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+-- TODO: создать табличку заранее заданных функций и сделать список заранее заданных функций
+--       * read и write уйдут в ту мапу функций
+-- TODO: добавить elif
+-- TODO: убрать try из funCallP и заменить на varOfFunP
+-- TODO: поддержать строки (и все функции с ними)
+-- TODO: поддержать массивы (и все функции с ними)
+
+-- Refactoring
+-- TODO: заменить StateT Environment (MaybeT IO) Type на newtype Interpret a = Interpret { runInterpet :: StateT ... }
+-- TODO: добавить whenT (который как when, но с Type и return Unit)
+-- TODO: toString через библиотеку форматирования fmt (красота кода)
+-- TODO: заменить String на Text
+-- TODO: послушать лекцию и перейти на lens
+
 module Compiler.Rum.Structure where
 
-
-import           Data.Bool (bool)
 import qualified Data.HashMap.Strict as HM
-import           Data.Hashable              (Hashable)
-import           Control.Monad.State
-import           Control.Applicative        (liftA2)
-import           Text.Read                  (readMaybe)
+import           Data.Hashable             (Hashable)
 
-type Program = [Statement]
+data Type = Number Int | Str String | Unit          deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
 
@@ -21,25 +30,51 @@ data LogicOp = And | Or | Xor deriving (Show)
 
 newtype Variable = Variable {name :: String} deriving (Show, Eq, Ord, Hashable)
 
-data Expression = Const Int
+data Expression = Const Type
                 | Var   Variable
                 | Neg   Expression
                 | BinOper   {bop :: BinOp,   l, r :: Expression}
                 | CompOper  {cop :: CompOp,  l, r :: Expression}
                 | LogicOper {lop :: LogicOp, l, r :: Expression}
+                | FunCall   {fName :: Variable, args :: [Expression]}
                 | ReadLn
                 deriving (Show)
 
-data Statement = Assignment  {var :: Variable, value :: Expression}
-               | WriteLn     {arg :: Expression}
-               | Skip
-               | IfElse      {ifCond    :: Expression, trueAct, falseAct :: Program}
-               | RepeatUntil {repCond   :: Expression, act :: Program}
-               | WhileDo     {whileCond :: Expression, act :: Program}
-               | For         {start :: Program, expr :: Expression, update, body :: Program}
-               deriving (Show)
+data Statement  = Assignment  {var :: Variable, value :: Expression}
+                | WriteLn     {arg :: Expression}
+                | Skip
+                | IfElse      {ifCond    :: Expression, trueAct, falseAct :: Program}
+                | RepeatUntil {repCond   :: Expression, act :: Program}
+                | WhileDo     {whileCond :: Expression, act :: Program}
+                | For         {start  :: Program, expr :: Expression, update, body :: Program}
+                | Fun         {funName :: Variable, params :: [Variable], funBody :: Program}
+                | Return      {retExp :: Expression}
+                deriving (Show)
 
-type Environment = HM.HashMap Variable Int
+type Program    = [Statement]
+-------------------------
+--- Environment Stuff ---
+-------------------------
+type VarEnv = HM.HashMap Variable Type
+type FunEnv = HM.HashMap Variable ([Variable], Program)  -- HashMap Variable ([Variable] -> StateT Env (MaybeT IO) Type)
+data Environment = Env {varEnv :: VarEnv, funEnv :: FunEnv, isReturn :: Bool}
+
+updateVars :: Variable -> Type -> Environment ->  Environment
+updateVars v val env@Env{..} = env {varEnv = HM.insert v val varEnv}
+
+updateFuns :: Variable -> [Variable] -> Program -> Environment -> Environment
+updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
+
+
+updateBool :: Bool -> Environment -> Environment
+updateBool b env = env {isReturn = b}
+
+findVar :: Variable -> Environment -> Maybe Type
+findVar x Env{..} = HM.lookup x varEnv
+
+findFun :: Variable -> Environment -> Maybe ([Variable], Program)
+findFun x Env{..} = HM.lookup x funEnv
+-------------------------
 
 binOp :: BinOp -> (Int -> Int -> Int)
 binOp Add = (+)
@@ -88,17 +123,3 @@ _ -|- _ = 1
 -- hack till idk the operator meaning
 (-!-) :: Int -> Int -> Int
 (-!-) = (-|-)
-
-eval :: Expression -> StateT Environment IO (Maybe Int)
-eval (Const c)     = pure (Just c)
-eval (Var v)       = gets (HM.lookup v)
-eval (Neg e)       = (negate <$>) <$> eval e
-eval BinOper{..}   = liftA2 (liftA2 $ binOp bop)   (eval l) (eval r)
-eval LogicOper{..} = liftA2 (liftA2 $ logicOp lop) (eval l) (eval r)
-eval CompOper{..}  = liftA2 (liftA2 intCompare)    (eval l) (eval r)
-  where
-    intCompare :: Int -> Int -> Int
-    intCompare x y = bool 0 1 $ compOp cop x y
-eval ReadLn        = do
-    input <- lift getLine
-    return $ readMaybe input
