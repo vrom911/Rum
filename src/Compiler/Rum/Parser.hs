@@ -22,7 +22,7 @@ keyword :: String -> Parser ()
 keyword w = string w *> notFollowedBy alphaNumChar *> space
 
 keyWords :: [String]
-keyWords = ["skip", "write", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return"]
+keyWords = ["skip", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return"]
 
 numP :: Parser Int
 numP = (read <$> some digitChar) <* space
@@ -40,11 +40,11 @@ paramsP = varNameP `sepBy` chSpace ','
 parens :: Parser a -> Parser a
 parens = between (chSpace '(') (chSpace ')')
 
-funCallP :: Parser Expression
-funCallP = do
+funCallP :: (FunCall -> f) -> Parser f
+funCallP funCtor = do
     n <- varNameP
     e <- parens (exprP `sepBy` chSpace ',')
-    return$ FunCall n e
+    return $ funCtor $ FunCall n e
 
 aOperators :: [[Operator Parser Expression]]
 aOperators =
@@ -75,8 +75,7 @@ aOperators =
 basicExprP :: Parser Expression
 basicExprP =   parens arithmeticExprP
            <|> Const . Number <$> numP
-           <|> ReadLn  <$ strSpace "read()"
-           <|> try funCallP
+           <|> try (funCallP FunCallExp)
            <|> Var     <$> varNameP
 
 arithmeticExprP, exprP:: Parser Expression
@@ -97,25 +96,20 @@ betweenDo = between (keyword "do") (keyword "od")
 
 stmtP :: Parser Statement
 stmtP =   parens stmtP
-      <|> writeP
       <|> skipP
       <|> ifP
       <|> repeatP
       <|> whileP
       <|> forP
       <|> returnP
-      <|> assignP
+      <|> try assignP
+      <|> funCallP FunCallStmt
   where
     assignP :: Parser Statement
     assignP = do
         v <- varNameP <* strSpace ":="
         e <- exprP
         return $ Assignment v e
-
-    writeP :: Parser Statement
-    writeP = do
-        e <- keyword "write" *> parens exprP
-        return $ WriteLn e
 
     skipP :: Parser Statement
     skipP = Skip <$ keyword "skip"

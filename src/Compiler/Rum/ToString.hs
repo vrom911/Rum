@@ -15,7 +15,6 @@ progToStr n (x1:x2:xs) = stmtToStr n x1 ++ ";" ++ progToStr n (x2:xs)
 
 stmtToStr :: Int -> Statement -> String
 stmtToStr n Assignment{..}  = tab n ++ name var ++ " := " ++ exprToStr value
-stmtToStr n WriteLn{..}     = tab n ++ "write (" ++ exprToStr arg ++ ")"
 stmtToStr n Skip            = tab n ++ "skip "
 stmtToStr n IfElse{..}      = tab n ++ "if"   ++ tab (succ n) ++ exprToStr ifCond ++
                               tab n ++ "then" ++ progToStr (succ n) trueAct ++
@@ -36,6 +35,7 @@ stmtToStr n Fun{..}         = tab n ++ "fun " ++ name funName ++ "(" ++ expListS
                               progToStr (succ n) funBody ++
                               tab n ++ "end"
 stmtToStr n Return{..}      = tab n ++ "return " ++ exprToStr retExp
+stmtToStr n (FunCallStmt f) = tab n ++ funCallToStr f
 
 exprToStr :: Expression -> String
 exprToStr (Const c)     = typeToStr c
@@ -44,8 +44,10 @@ exprToStr (Neg e)       = "-(" ++ exprToStr e ++ ")"
 exprToStr BinOper{..}   = paren l ++ bToStr bop ++ paren r
 exprToStr LogicOper{..} = paren l ++ lToStr lop ++ paren r
 exprToStr CompOper{..}  = paren l ++ cToStr cop ++ paren r
-exprToStr ReadLn        = "read()"
-exprToStr FunCall{..}   = name fName ++ "(" ++ expListStr args ++ ")"
+exprToStr (FunCallExp f)= funCallToStr f
+
+funCallToStr :: FunCall -> String
+funCallToStr FunCall{..}   = name fName ++ "(" ++ expListStr args ++ ")"
 
 typeToStr :: Type -> String
 typeToStr (Number n) = show n

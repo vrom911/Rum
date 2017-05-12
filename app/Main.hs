@@ -7,6 +7,7 @@ import Text.Megaparsec           (parse)
 
 import Compiler.Rum.Interpreter
 import Compiler.Rum.Parser
+import Compiler.Rum.Rumlude
 import Compiler.Rum.Structure
 import Compiler.Rum.ToString
 
@@ -29,9 +30,9 @@ run fileName f = do
 test :: [Statement] -> IO ()
 test p = do
     print p
-    let mt = evalStateT (interpret p) (Env mempty mempty False)
+    let mt = evalStateT (interpret p) (Env mempty preludeLibrary False)
     () <$ runMaybeT mt
     putStrLn $ progToStr 0 p
 
 interpr :: [Statement] -> IO ()
-interpr p = () <$ runMaybeT (evalStateT (interpret p) (Env mempty mempty False))
+interpr p = () <$ runMaybeT (evalStateT (interpret p) (Env mempty preludeLibrary False))

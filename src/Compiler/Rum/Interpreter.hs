@@ -6,11 +6,9 @@ import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 import           Data.Bool                 (bool)
-import qualified Data.HashMap.Strict as HM (fromList)
-import           Text.Read                 (readMaybe)
+import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Structure
-import           Compiler.Rum.ToString (typeToStr)
 
 
 interpret :: Program -> StateT Environment (MaybeT IO) Type
@@ -21,36 +19,25 @@ interpret (st:stmts) = do
     if x then return stRes else interpret stmts
 
 interpretSt :: Statement -> StateT Environment (MaybeT IO) Type
-interpretSt Assignment{..}     = eval value >>= \x -> modify (updateVars var x) >> return Unit
+interpretSt Assignment{..}     = eval value >>= \x -> modifyT (updateVars var x)
 interpretSt Skip               = return Unit
 interpretSt IfElse{..}         = eval ifCond >>= \x ->
     if x == Number 0 then interpret falseAct else interpret trueAct
 interpretSt st@WhileDo{..}     = do
     c <- eval whileCond
-    if c /= Number 0 then interpret act >> interpretSt st
-    else return Unit
+    whenT (c /= Number 0) $ interpret act >> interpretSt st
 interpretSt st@RepeatUntil{..} = do
     () <$ interpret act
     c <- eval repCond
-    if c == Number 0 then interpretSt st else return Unit
+    whenT (c == Number 0) $ interpretSt st
 interpretSt For{..} = interpret start *> forDo
   where
     forDo = do
         c <- eval expr
-        if c /= Number 0 then do
-            () <$ interpret body
-            () <$ interpret update
-            forDo
-        else
-            return Unit
-interpretSt WriteLn{..} = do
-    res <- eval arg
---    lift $ putStr "> > " -- for compiler-test/expressions
---    liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
-    liftIO $ putStrLn $ typeToStr res  -- res ?: error "writeln error"
-    return Unit
-interpretSt Fun{..} = modify (updateFuns funName params funBody) >> return Unit
+        whenT (c /= Number 0) $ interpret body >> interpret update >> forDo
+interpretSt Fun{..} = modifyT (updateFuns funName params $ \_ -> interpret funBody)
 interpretSt Return{..} = modify (updateBool True) >> eval retExp
+interpretSt (FunCallStmt f) = evalFunCall f
 
 {-
  StateT s (MaybeT IO) a = s -> IO (Maybe (a, s))
@@ -81,16 +68,26 @@ eval CompOper{..}  = liftA2 intCompare (eval l) (eval r)
   where
     intCompare :: Type -> Type -> Type
     intCompare x y = Number $ bool 0 1 $ compOp cop x y
-eval ReadLn        = do
-    input <- liftIO getLine
-    case readMaybe input of
-        Nothing -> empty
-        Just x -> pure (Number x)
-eval FunCall{..} = do
-   env <- get
-   let funs = funEnv env
-   a <- mapM eval args
-   Just (names, stm) <- gets (findFun fName)
---   let Just (names, stm) = pair-- HM.lookup fName funs
-   let locals = HM.fromList (zip names a)
-   lift $ evalStateT (interpret stm) (Env locals funs False)
+eval (FunCallExp f) = evalFunCall f
+
+
+
+evalFunCall :: FunCall -> MyStateT
+evalFunCall FunCall{..} = do
+    env <- get
+    let funs = funEnv env
+    let globals = varEnv env
+    evalArgs <- mapM eval args
+    Just (names, fun) <- gets (findFun fName)
+    --   let Just (names, stm) = pair-- HM.lookup fName funs
+    let locals = HM.fromList (zip names evalArgs)
+    lift $ evalStateT (fun evalArgs) (Env (locals `HM.union` globals) funs False)
+
+--------------
+---- Util ----
+--------------
+whenT :: (Applicative f) => Bool -> f Type -> f Type
+whenT cond s  = if cond then s else pure Unit
+
+modifyT :: MonadState s m => (s -> s) -> m Type
+modifyT f = modify f >> pure Unit

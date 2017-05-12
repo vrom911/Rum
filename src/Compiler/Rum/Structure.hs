@@ -1,24 +1,24 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
--- TODO: создать табличку заранее заданных функций и сделать список заранее заданных функций
---       * read и write уйдут в ту мапу функций
 -- TODO: добавить elif
--- TODO: убрать try из funCallP и заменить на varOfFunP
 -- TODO: поддержать строки (и все функции с ними)
 -- TODO: поддержать массивы (и все функции с ними)
 
 -- Refactoring
 -- TODO: заменить StateT Environment (MaybeT IO) Type на newtype Interpret a = Interpret { runInterpet :: StateT ... }
--- TODO: добавить whenT (который как when, но с Type и return Unit)
 -- TODO: toString через библиотеку форматирования fmt (красота кода)
 -- TODO: заменить String на Text
+-- TODO: убрать try из funCallP и заменить на varOfFunP (но придётся разбить на две функции)
 -- TODO: послушать лекцию и перейти на lens
 
 module Compiler.Rum.Structure where
 
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)
+import           Control.Monad.State
+import           Control.Monad.Trans.Maybe
+
 
 data Type = Number Int | Str String | Unit          deriving (Show, Eq, Ord)
 
@@ -30,18 +30,18 @@ data LogicOp = And | Or | Xor deriving (Show)
 
 newtype Variable = Variable {name :: String} deriving (Show, Eq, Ord, Hashable)
 
+data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
                 | Var   Variable
                 | Neg   Expression
                 | BinOper   {bop :: BinOp,   l, r :: Expression}
                 | CompOper  {cop :: CompOp,  l, r :: Expression}
                 | LogicOper {lop :: LogicOp, l, r :: Expression}
-                | FunCall   {fName :: Variable, args :: [Expression]}
-                | ReadLn
+                | FunCallExp FunCall
                 deriving (Show)
 
 data Statement  = Assignment  {var :: Variable, value :: Expression}
-                | WriteLn     {arg :: Expression}
+                | FunCallStmt FunCall
                 | Skip
                 | IfElse      {ifCond    :: Expression, trueAct, falseAct :: Program}
                 | RepeatUntil {repCond   :: Expression, act :: Program}
@@ -55,14 +55,15 @@ type Program    = [Statement]
 -------------------------
 --- Environment Stuff ---
 -------------------------
+type MyStateT = StateT Environment (MaybeT IO) Type
 type VarEnv = HM.HashMap Variable Type
-type FunEnv = HM.HashMap Variable ([Variable], Program)  -- HashMap Variable ([Variable] -> StateT Env (MaybeT IO) Type)
+type FunEnv = HM.HashMap Variable ([Variable], [Type] -> MyStateT)
 data Environment = Env {varEnv :: VarEnv, funEnv :: FunEnv, isReturn :: Bool}
 
 updateVars :: Variable -> Type -> Environment ->  Environment
 updateVars v val env@Env{..} = env {varEnv = HM.insert v val varEnv}
 
-updateFuns :: Variable -> [Variable] -> Program -> Environment -> Environment
+updateFuns :: Variable -> [Variable] -> ([Type] -> MyStateT) -> Environment -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
 
 
@@ -72,8 +73,9 @@ updateBool b env = env {isReturn = b}
 findVar :: Variable -> Environment -> Maybe Type
 findVar x Env{..} = HM.lookup x varEnv
 
-findFun :: Variable -> Environment -> Maybe ([Variable], Program)
+findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> MyStateT)
 findFun x Env{..} = HM.lookup x funEnv
+
 -------------------------
 
 binOp :: BinOp -> (Int -> Int -> Int)
@@ -123,3 +125,5 @@ _ -|- _ = 1
 -- hack till idk the operator meaning
 (-!-) :: Int -> Int -> Int
 (-!-) = (-|-)
+
+
