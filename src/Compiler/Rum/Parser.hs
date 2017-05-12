@@ -115,11 +115,13 @@ stmtP =   parens stmtP
     skipP = Skip <$ keyword "skip"
 
     ifP :: Parser Statement
-    ifP = do
-        cond  <- keyword "if"   *> exprP
+    ifP = keyword "if" *> ifHelper <* keyword "fi"
+
+    ifHelper :: Parser Statement
+    ifHelper = do
+        cond  <- exprP
         true  <- keyword "then" *> progMainP
-        false <- option [Skip] (keyword "else" *> progMainP)
-        ()    <$ keyword "fi"
+        false <- try (keyword "elif" *> ((:[]) <$> ifHelper)) <|> option [Skip] (keyword "else" *> progMainP)
         return $ IfElse cond true false
 
     repeatP :: Parser Statement
