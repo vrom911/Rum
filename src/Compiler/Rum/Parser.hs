@@ -2,8 +2,8 @@ module Compiler.Rum.Parser where
 
 
 import Control.Applicative    ((<|>), liftA2)
-import Text.Megaparsec        ( alphaNumChar, between, char
-                              , digitChar, letterChar, many
+import Text.Megaparsec        ( anyChar, alphaNumChar, between, char
+                              , digitChar, letterChar, many, manyTill
                               , notFollowedBy, oneOf, option
                               , sepBy, some, space, string, try
                               )
@@ -22,10 +22,19 @@ keyword :: String -> Parser ()
 keyword w = string w *> notFollowedBy alphaNumChar *> space
 
 keyWords :: [String]
-keyWords = ["skip", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return"]
+keyWords = ["skip", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return", "true", "false"]
 
 numP :: Parser Int
 numP = (read <$> some digitChar) <* space
+
+charP :: Parser Char
+charP = between (char '\'') (char '\'') anyChar <* space
+
+strP :: Parser String
+strP = char '"' *> anyChar `manyTill` char '"' <* space
+
+boolP :: Parser Int
+boolP = (1 <$ string "true" <|> 0 <$ string "false") <* space
 
 varNameP :: Parser Variable
 varNameP = Variable <$> ((((:) <$> (try (oneOf "_$") <|> letterChar)
@@ -75,6 +84,9 @@ aOperators =
 basicExprP :: Parser Expression
 basicExprP =   parens arithmeticExprP
            <|> Const . Number <$> numP
+           <|> Const . Ch     <$> charP
+           <|> Const . Str    <$> strP
+           <|> Const . Number <$> boolP
            <|> try (funCallP FunCallExp)
            <|> Var     <$> varNameP
 
@@ -103,7 +115,7 @@ stmtP =   parens stmtP
       <|> forP
       <|> returnP
       <|> try assignP
-      <|> funCallP FunCallStmt
+      <|> funCallStmtP
   where
     assignP :: Parser Statement
     assignP = do
@@ -146,6 +158,15 @@ stmtP =   parens stmtP
 
     returnP :: Parser Statement
     returnP = Return <$> (keyword "return" *> exprP)
+
+    funCallStmtP :: Parser Statement
+    funCallStmtP = do
+        fs@(FunCallStmt f) <- funCallP FunCallStmt
+        let funname = fName f
+        if funname == Variable "strset" then
+            let Var v = head (args f) in
+            return $ Assignment v (FunCallExp f)
+        else return fs
 
 funP :: Parser Statement
 funP = do

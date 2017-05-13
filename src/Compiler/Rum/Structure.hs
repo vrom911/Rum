@@ -1,8 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
--- TODO: добавить elif
--- TODO: поддержать строки (и все функции с ними)
 -- TODO: поддержать массивы (и все функции с ними)
 
 -- Refactoring
@@ -20,7 +18,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 
 
-data Type = Number Int | Str String | Unit          deriving (Show, Eq, Ord)
+data Type = Number Int | Ch Char | Str String | Unit deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
 

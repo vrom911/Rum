@@ -10,7 +10,6 @@ import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Structure
 
-
 interpret :: Program -> StateT Environment (MaybeT IO) Type
 interpret [] = return Unit
 interpret (st:stmts) = do

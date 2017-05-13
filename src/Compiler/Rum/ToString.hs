@@ -51,13 +51,14 @@ funCallToStr FunCall{..}   = name fName ++ "(" ++ expListStr args ++ ")"
 
 typeToStr :: Type -> String
 typeToStr (Number n) = show n
-typeToStr (Str s) = s
-typeToStr Unit = "()"
+typeToStr (Ch c)     = show c
+typeToStr (Str s)    = s
+typeToStr Unit       = "()"
 
 expListStr :: [Expression] -> String
 expListStr [] = ""
 expListStr [x] = exprToStr x
-expListStr (x1:x2:xs) = exprToStr x1 ++", " ++ exprToStr x2 ++ expListStr xs
+expListStr (x1:x2:xs) = exprToStr x1 ++", " ++ expListStr (x2:xs)
 
 paren :: Expression -> String
 paren e@(Const _) = exprToStr e
