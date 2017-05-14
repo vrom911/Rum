@@ -6,7 +6,7 @@ import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 import           Data.Bool                 (bool)
-import Data.List (foldl')
+import           Data.List                 (foldl')
 import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Structure
@@ -19,9 +19,9 @@ interpret (st:stmts) = do
     if x then return stRes else interpret stmts
 
 interpretSt :: Statement -> StateT Environment (MaybeT IO) Type
-interpretSt AssignmentVar{..}     = eval value >>= \x -> modifyT (updateVars var x)
-interpretSt AssignmentArr{..}     = eval value >>= \x -> mapM eval (index arrC)
-                                               >>= \inds -> modifyT (updateArrs (arr arrC) inds x)
+interpretSt AssignmentVar{..}  = eval value >>= \x -> modifyT (updateVars var x)
+interpretSt AssignmentArr{..}  = eval value >>= \x -> mapM eval (index arrC)
+                                            >>= \inds -> modifyT (updateArrs (arr arrC) inds x)
 interpretSt Skip               = return Unit
 interpretSt IfElse{..}         = eval ifCond >>= \x ->
     if x == Number 0 then interpret falseAct else interpret trueAct
@@ -82,11 +82,10 @@ eval (FunCallExp f) = evalFunCall f
 evalFunCall :: FunCall -> MyStateT
 evalFunCall FunCall{..} = do
     env <- get
-    let funs = funEnv env
+    let funs    = funEnv env
     let globals = varEnv env
-    evalArgs <- mapM eval args
+    evalArgs          <- mapM eval args
     Just (names, fun) <- gets (findFun fName)
-    --   let Just (names, stm) = pair-- HM.lookup fName funs
     let locals = HM.fromList (zip names evalArgs)
     lift $ evalStateT (fun evalArgs) (Env (locals `HM.union` globals) funs False)
 

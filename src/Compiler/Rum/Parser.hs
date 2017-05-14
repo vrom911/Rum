@@ -4,7 +4,7 @@ module Compiler.Rum.Parser where
 import Control.Applicative    ((<|>), liftA2)
 import Text.Megaparsec        ( anyChar, alphaNumChar, between, char
                               , digitChar, letterChar, many, manyTill
-                              , notFollowedBy, oneOf, option
+                              , notFollowedBy, oneOf, option, optional
                               , sepBy, some, space, string, try
                               )
 import Text.Megaparsec.Expr   (Operator(..), makeExprParser)
@@ -39,23 +39,31 @@ strP = char '"' *> anyChar `manyTill` char '"' <* space
 boolP :: Parser Int
 boolP = (1 <$ string "true" <|> 0 <$ string "false") <* space
 
-nameP :: Parser String
-nameP = ((:) <$> (try (oneOf "_$") <|> letterChar)
+varNameP :: Parser Variable
+varNameP = Variable <$> (((:) <$> (try (oneOf "_$") <|> letterChar)
                                 <*> many (try alphaNumChar <|> oneOf "_$")) >>= \x -> if x `elem` keyWords
                                 then fail "Can not use Key words as variable names"
-                                else pure x
+                                else pure x) <* space
 
-varNameP :: Parser Variable
-varNameP = Variable <$> (nameP <* space)
-
-arrNameP :: Parser Expression
-arrNameP = do
-    arName <- nameP
-    ex <- some $ between (strSpace "[") (strSpace "]") exprP
-    return $ ArrC $ ArrCell (Variable arName) ex
+varArrFuncallNameP :: Parser Expression
+varArrFuncallNameP = do
+    wtfName <- varNameP
+    maybeArr <- optional $ some $ between (strSpace "[") (strSpace "]") exprP
+    case maybeArr of
+        Just arrExp -> return $ ArrC $ ArrCell wtfName arrExp
+        Nothing -> do
+            maybeFun <- optional $ parens (exprP `sepBy` chSpace ',')
+            case maybeFun of
+                Just ex -> return $ FunCallExp $ FunCall wtfName ex
+                Nothing -> return $ Var wtfName
 
 varOrArrP :: Parser Expression
-varOrArrP = try arrNameP <|> Var <$> varNameP
+varOrArrP = do
+    arName <- varNameP
+    ex <- optional $ some $ between (strSpace "[") (strSpace "]") exprP
+    case ex of
+        Nothing -> return $ Var arName
+        Just exs -> return $ ArrC $ ArrCell arName exs
 
 arrP :: Parser [Expression]
 arrP = between (strSpace "[") (strSpace "]") (exprP `sepBy` chSpace ',')
@@ -108,8 +116,7 @@ basicExprP =   parens arithmeticExprP
            <|> Const . Str    <$> strP
            <|> Const . Number <$> boolP
            <|> ArrLit         <$> (arrP <|> emptyArrP)
-           <|> try (funCallP FunCallExp)
-           <|> varOrArrP
+           <|> varArrFuncallNameP
 
 arithmeticExprP, exprP:: Parser Expression
 arithmeticExprP = makeExprParser basicExprP aOperators

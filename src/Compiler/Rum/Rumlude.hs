@@ -4,6 +4,7 @@ import           Control.Applicative       (empty)
 import           Control.Monad.Trans       (liftIO)
 import           Data.Char                 (ord)
 import qualified Data.HashMap.Strict as HM (fromList)
+import           Data.List                 (intercalate)
 import           Text.Read                 (readMaybe)
 
 
@@ -34,8 +35,8 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
 
     writeFun :: [Type] -> MyStateT
     writeFun [x] = do
---      liftIO $ putStr "> > " -- for compiler-test/expressions
-        liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
+--        liftIO $ putStr "> > " -- for compiler-test/expressions
+--        liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
         liftIO $ putStrLn $ typeToInt x  -- res ?: error "writeln error"
         return Unit
           where
@@ -43,6 +44,7 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
             typeToInt (Number n) = show n
             typeToInt (Ch c)     = show $ ord c
             typeToInt (Str s)    = s
+            typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
             typeToInt Unit       = "()"
     writeFun _ = error "Paste Several arggs to write function"
 
@@ -69,7 +71,7 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     strset [Str s, Number i, Ch c] =
         let (beg, _:rest) = splitAt i s in
         return (Str $ beg ++ (c:rest))
-    strset _ = error "strset() can be only applied to Strings"
+    strset _ = error "strset() params should be (String, Int, Char)"
 
     strcat :: [Type] -> MyStateT
     strcat [Str s, Str d] = return (Str $ s ++ d)
@@ -84,17 +86,17 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
 
     strmake :: [Type] -> MyStateT
     strmake [Number n, Ch ch] = return $ Str $ replicate n ch
-    strmake _ = error "strmake() error"
+    strmake _ = error "strmake() errorparams should be (Int, Char)"
 
     ----------------------
     -- Array Functions --
     ----------------------
     arrlen :: [Type] -> MyStateT
     arrlen [Arr ar] = return (Number $ length ar)
-    arrlen _       = error "arrlen() can be only applied to Strings"
+    arrlen _       = error "arrlen() can be only applied to Arrays"
 
     arrmake :: [Type] -> MyStateT
     arrmake [Number n, x] = return $ Arr $ replicate n x
-    arrmake _       = error "arrmake() error"
+    arrmake _       = error "arrmake() wrong params"
 
 

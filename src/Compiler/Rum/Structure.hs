@@ -5,7 +5,6 @@
 -- TODO: заменить StateT Environment (MaybeT IO) Type на newtype Interpret a = Interpret { runInterpet :: StateT ... }
 -- TODO: toString через библиотеку форматирования fmt (красота кода)
 -- TODO: заменить String на Text
--- TODO: убрать try из funCallP и заменить на varOfFunP (но придётся разбить на две функции)
 -- TODO: послушать лекцию и перейти на lens
 
 module Compiler.Rum.Structure where
@@ -74,7 +73,6 @@ setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
 updateFuns :: Variable -> [Variable] -> ([Type] -> MyStateT) -> Environment -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
-
 
 updateBool :: Bool -> Environment -> Environment
 updateBool b env = env {isReturn = b}
