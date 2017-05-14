@@ -2,15 +2,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Refactoring
--- TODO: заменить StateT Environment (MaybeT IO) Type на newtype Interpret a = Interpret { runInterpet :: StateT ... }
--- TODO: toString через библиотеку форматирования fmt (красота кода)
 -- TODO: заменить String на Text
--- TODO: послушать лекцию и перейти на lens
+-- TODO: перейти на lens
 
 module Compiler.Rum.Structure where
 
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)
+import           Control.Applicative
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 
@@ -53,9 +52,20 @@ type Program    = [Statement]
 -------------------------
 --- Environment Stuff ---
 -------------------------
-type MyStateT = StateT Environment (MaybeT IO) Type
+newtype Interpret a = Interpret
+    { runInterpret :: StateT Environment (MaybeT IO) a
+    } deriving (Functor, Applicative, Monad, MonadIO, MonadState Environment, Alternative)
+
+evalRunInterpret :: Interpret a -> Environment -> MaybeT IO a
+evalRunInterpret = evalStateT . runInterpret
+
+runIOInterpret :: Interpret a -> Environment -> IO ()
+runIOInterpret action env = () <$ runMaybeT (evalRunInterpret action env)
+
+type InterpretT = Interpret Type
+
 type VarEnv = HM.HashMap Variable Type
-type FunEnv = HM.HashMap Variable ([Variable], [Type] -> MyStateT)
+type FunEnv = HM.HashMap Variable ([Variable], [Type] -> InterpretT)
 data Environment = Env {varEnv :: VarEnv, funEnv :: FunEnv, isReturn :: Bool}
 
 updateVars :: Variable -> Type -> Environment ->  Environment
@@ -71,7 +81,7 @@ setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ 
 setArrsCell (Number i:is) x (Arr ar) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr (setArrsCell is x cur):rest)
 setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
-updateFuns :: Variable -> [Variable] -> ([Type] -> MyStateT) -> Environment -> Environment
+updateFuns :: Variable -> [Variable] -> ([Type] -> InterpretT) -> Environment -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
 
 updateBool :: Bool -> Environment -> Environment
@@ -80,7 +90,7 @@ updateBool b env = env {isReturn = b}
 findVar :: Variable -> Environment -> Maybe Type
 findVar x Env{..} = HM.lookup x varEnv
 
-findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> MyStateT)
+findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> InterpretT)
 findFun x Env{..} = HM.lookup x funEnv
 
 -------------------------

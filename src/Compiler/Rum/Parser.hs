@@ -40,8 +40,8 @@ boolP :: Parser Int
 boolP = (1 <$ string "true" <|> 0 <$ string "false") <* space
 
 varNameP :: Parser Variable
-varNameP = Variable <$> (((:) <$> (try (oneOf "_$") <|> letterChar)
-                                <*> many (try alphaNumChar <|> oneOf "_$")) >>= \x -> if x `elem` keyWords
+varNameP = Variable <$> (((:) <$> (try (oneOf ['_','$']) <|> letterChar)
+                                <*> many (try alphaNumChar <|> oneOf ['_','$'])) >>= \x -> if x `elem` keyWords
                                 then fail "Can not use Key words as variable names"
                                 else pure x) <* space
 
@@ -53,9 +53,9 @@ varArrFuncallNameP = do
         Just arrExp -> return $ ArrC $ ArrCell wtfName arrExp
         Nothing -> do
             maybeFun <- optional $ parens (exprP `sepBy` chSpace ',')
-            case maybeFun of
-                Just ex -> return $ FunCallExp $ FunCall wtfName ex
-                Nothing -> return $ Var wtfName
+            return $ case maybeFun of
+                Just ex -> FunCallExp $ FunCall wtfName ex
+                Nothing -> Var wtfName
 
 varOrArrP :: Parser Expression
 varOrArrP = do

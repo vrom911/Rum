@@ -4,21 +4,20 @@ module Compiler.Rum.Interpreter where
 
 import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State
-import           Control.Monad.Trans.Maybe
 import           Data.Bool                 (bool)
 import           Data.List                 (foldl')
 import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Structure
 
-interpret :: Program -> StateT Environment (MaybeT IO) Type
+interpret :: Program -> InterpretT
 interpret [] = return Unit
 interpret (st:stmts) = do
     stRes <- interpretSt st
     x <- gets isReturn
     if x then return stRes else interpret stmts
 
-interpretSt :: Statement -> StateT Environment (MaybeT IO) Type
+interpretSt :: Statement -> InterpretT
 interpretSt AssignmentVar{..}  = eval value >>= \x -> modifyT (updateVars var x)
 interpretSt AssignmentArr{..}  = eval value >>= \x -> mapM eval (index arrC)
                                             >>= \inds -> modifyT (updateArrs (arr arrC) inds x)
@@ -47,7 +46,7 @@ interpretSt (FunCallStmt f) = evalFunCall f
  pure x :: a -> m a = a -> StateT s (MaybeT IO) a = a -> (s -> IO (Maybe (a, s))
  empty :: StateT s (MaybeT IO) a = s -> IO Nothing
 -}
-eval :: Expression -> StateT Environment (MaybeT IO) Type  -- Environment -> IO (Maybe (Type, Environment))
+eval :: Expression -> InterpretT
 eval (Const c)     = pure c
 eval (Var v)       = do
     var <- gets (findVar v)
@@ -79,7 +78,7 @@ eval (FunCallExp f) = evalFunCall f
 
 
 
-evalFunCall :: FunCall -> MyStateT
+evalFunCall :: FunCall -> InterpretT
 evalFunCall FunCall{..} = do
     env <- get
     let funs    = funEnv env
@@ -87,7 +86,7 @@ evalFunCall FunCall{..} = do
     evalArgs          <- mapM eval args
     Just (names, fun) <- gets (findFun fName)
     let locals = HM.fromList (zip names evalArgs)
-    lift $ evalStateT (fun evalArgs) (Env (locals `HM.union` globals) funs False)
+    Interpret $ lift $ evalRunInterpret (fun evalArgs) (Env (locals `HM.union` globals) funs False)
 
 --------------
 ---- Util ----

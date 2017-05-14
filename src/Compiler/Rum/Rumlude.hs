@@ -30,10 +30,10 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
                              , (Variable "Arrmake", ([], arrmake))
                              ]
   where
-    readFun :: [Type] -> MyStateT
+    readFun :: [Type] -> InterpretT
     readFun _ = liftIO getLine >>= \input -> maybe empty (pure . Number) (readMaybe input)
 
-    writeFun :: [Type] -> MyStateT
+    writeFun :: [Type] -> InterpretT
     writeFun [x] = do
 --        liftIO $ putStr "> > " -- for compiler-test/expressions
 --        liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
@@ -51,51 +51,51 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     ----------------------
     -- String Functions --
     ----------------------
-    strlen :: [Type] -> MyStateT
+    strlen :: [Type] -> InterpretT
     strlen [Str s] = return (Number $ length s)
     strlen _       = error "strlen() can be only applied to Strings"
 
-    strget :: [Type] -> MyStateT
+    strget :: [Type] -> InterpretT
     strget [Str s, Number i] = return (Ch $ s !! i)
     strget _                 = error "strget() params should be (String, Int)"
 
-    strsub :: [Type] -> MyStateT
+    strsub :: [Type] -> InterpretT
     strsub [Str s, Number from, Number n] = return (Str (take n (drop from s)))
     strsub _ = error "strsub() params should be (String, Int, Int)"
 
-    strdup :: [Type] -> MyStateT
+    strdup :: [Type] -> InterpretT
     strdup [Str s] = return $ Str s
     strdup _       = error "strdup() can be only applied to Strings"
 
-    strset :: [Type] -> MyStateT
+    strset :: [Type] -> InterpretT
     strset [Str s, Number i, Ch c] =
         let (beg, _:rest) = splitAt i s in
         return (Str $ beg ++ (c:rest))
     strset _ = error "strset() params should be (String, Int, Char)"
 
-    strcat :: [Type] -> MyStateT
+    strcat :: [Type] -> InterpretT
     strcat [Str s, Str d] = return (Str $ s ++ d)
     strcat _ = error "strcat() can be only applied to Strings"
 
-    strcmp :: [Type] -> MyStateT
+    strcmp :: [Type] -> InterpretT
     strcmp [Str s, Str d] = return $ Number $ case compare s d of
         EQ -> 0
         LT -> -1
         GT -> 1
     strcmp _ = error "strcmp() can be only applied to Strings"
 
-    strmake :: [Type] -> MyStateT
+    strmake :: [Type] -> InterpretT
     strmake [Number n, Ch ch] = return $ Str $ replicate n ch
     strmake _ = error "strmake() errorparams should be (Int, Char)"
 
     ----------------------
     -- Array Functions --
     ----------------------
-    arrlen :: [Type] -> MyStateT
+    arrlen :: [Type] -> InterpretT
     arrlen [Arr ar] = return (Number $ length ar)
     arrlen _       = error "arrlen() can be only applied to Arrays"
 
-    arrmake :: [Type] -> MyStateT
+    arrmake :: [Type] -> InterpretT
     arrmake [Number n, x] = return $ Arr $ replicate n x
     arrmake _       = error "arrmake() wrong params"
 

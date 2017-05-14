@@ -1,7 +1,5 @@
 module Main where
 
-import Control.Monad.State
-import Control.Monad.Trans.Maybe
 import System.Environment        (getArgs)
 import Text.Megaparsec           (parse)
 
@@ -30,9 +28,8 @@ run fileName f = do
 test :: [Statement] -> IO ()
 test p = do
     print p
-    let mt = evalStateT (interpret p) (Env mempty preludeLibrary False)
-    () <$ runMaybeT mt
+    interpr p
     putStrLn $ progToStr 0 p
 
 interpr :: [Statement] -> IO ()
-interpr p = () <$ runMaybeT (evalStateT (interpret p) (Env mempty preludeLibrary False))
+interpr p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)
