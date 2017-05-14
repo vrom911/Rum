@@ -22,7 +22,10 @@ keyword :: String -> Parser ()
 keyword w = string w *> notFollowedBy alphaNumChar *> space
 
 keyWords :: [String]
-keyWords = ["skip", "if", "then", "else", "fi", "repeat", "until", "do", "od", "while", "for", "fun", "begin", "end", "return", "true", "false"]
+keyWords = [ "skip", "if", "then", "else", "fi", "repeat"
+           , "until", "do", "od", "while", "for", "fun"
+           , "begin", "end", "return", "true", "false"
+           ]
 
 numP :: Parser Int
 numP = (read <$> some digitChar) <* space
@@ -36,12 +39,29 @@ strP = char '"' *> anyChar `manyTill` char '"' <* space
 boolP :: Parser Int
 boolP = (1 <$ string "true" <|> 0 <$ string "false") <* space
 
+nameP :: Parser String
+nameP = ((:) <$> (try (oneOf "_$") <|> letterChar)
+                                <*> many (try alphaNumChar <|> oneOf "_$")) >>= \x -> if x `elem` keyWords
+                                then fail "Can not use Key words as variable names"
+                                else pure x
+
 varNameP :: Parser Variable
-varNameP = Variable <$> ((((:) <$> (try (oneOf "_$") <|> letterChar)
-                        <*> many (try alphaNumChar <|> oneOf "_$")) >>= \x -> if x `elem` keyWords
-                        then fail "Can not use Key words as variable names"
-                        else pure x
-                        ) <* space)
+varNameP = Variable <$> (nameP <* space)
+
+arrNameP :: Parser Expression
+arrNameP = do
+    arName <- nameP
+    ex <- some $ between (strSpace "[") (strSpace "]") exprP
+    return $ ArrC $ ArrCell (Variable arName) ex
+
+varOrArrP :: Parser Expression
+varOrArrP = try arrNameP <|> Var <$> varNameP
+
+arrP :: Parser [Expression]
+arrP = between (strSpace "[") (strSpace "]") (exprP `sepBy` chSpace ',')
+
+emptyArrP :: Parser [Expression]
+emptyArrP = [] <$ strSpace "{}"
 
 paramsP :: Parser [Variable]
 paramsP = varNameP `sepBy` chSpace ','
@@ -87,8 +107,9 @@ basicExprP =   parens arithmeticExprP
            <|> Const . Ch     <$> charP
            <|> Const . Str    <$> strP
            <|> Const . Number <$> boolP
+           <|> ArrLit         <$> (arrP <|> emptyArrP)
            <|> try (funCallP FunCallExp)
-           <|> Var     <$> varNameP
+           <|> varOrArrP
 
 arithmeticExprP, exprP:: Parser Expression
 arithmeticExprP = makeExprParser basicExprP aOperators
@@ -119,9 +140,12 @@ stmtP =   parens stmtP
   where
     assignP :: Parser Statement
     assignP = do
-        v <- varNameP <* strSpace ":="
+        v <- varOrArrP <* strSpace ":="
         e <- exprP
-        return $ Assignment v e
+        return $ case v of
+            Var v'  -> AssignmentVar v' e
+            ArrC ar -> AssignmentArr ar e
+            _       -> error "Assignment left part fail"
 
     skipP :: Parser Statement
     skipP = Skip <$ keyword "skip"
@@ -165,7 +189,7 @@ stmtP =   parens stmtP
         let funname = fName f
         if funname == Variable "strset" then
             let Var v = head (args f) in
-            return $ Assignment v (FunCallExp f)
+            return $ AssignmentVar v (FunCallExp f)
         else return fs
 
 funP :: Parser Statement

@@ -24,6 +24,9 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
                              , (Variable "strcat",  ([], strcat))
                              , (Variable "strcmp",  ([], strcmp))
                              , (Variable "strmake", ([], strmake))
+                             , (Variable "arrlen",  ([], arrlen))
+                             , (Variable "arrmake", ([], arrmake))
+                             , (Variable "Arrmake", ([], arrmake))
                              ]
   where
     readFun :: [Type] -> MyStateT
@@ -32,7 +35,7 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     writeFun :: [Type] -> MyStateT
     writeFun [x] = do
 --      liftIO $ putStr "> > " -- for compiler-test/expressions
---      liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
+        liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
         liftIO $ putStrLn $ typeToInt x  -- res ?: error "writeln error"
         return Unit
           where
@@ -82,3 +85,16 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     strmake :: [Type] -> MyStateT
     strmake [Number n, Ch ch] = return $ Str $ replicate n ch
     strmake _ = error "strmake() error"
+
+    ----------------------
+    -- Array Functions --
+    ----------------------
+    arrlen :: [Type] -> MyStateT
+    arrlen [Arr ar] = return (Number $ length ar)
+    arrlen _       = error "arrlen() can be only applied to Strings"
+
+    arrmake :: [Type] -> MyStateT
+    arrmake [Number n, x] = return $ Arr $ replicate n x
+    arrmake _       = error "arrmake() error"
+
+

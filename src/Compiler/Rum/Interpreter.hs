@@ -6,6 +6,7 @@ import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 import           Data.Bool                 (bool)
+import Data.List (foldl')
 import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Structure
@@ -18,7 +19,9 @@ interpret (st:stmts) = do
     if x then return stRes else interpret stmts
 
 interpretSt :: Statement -> StateT Environment (MaybeT IO) Type
-interpretSt Assignment{..}     = eval value >>= \x -> modifyT (updateVars var x)
+interpretSt AssignmentVar{..}     = eval value >>= \x -> modifyT (updateVars var x)
+interpretSt AssignmentArr{..}     = eval value >>= \x -> mapM eval (index arrC)
+                                               >>= \inds -> modifyT (updateArrs (arr arrC) inds x)
 interpretSt Skip               = return Unit
 interpretSt IfElse{..}         = eval ifCond >>= \x ->
     if x == Number 0 then interpret falseAct else interpret trueAct
@@ -52,6 +55,11 @@ eval (Var v)       = do
     case var of
         Nothing -> empty
         Just x  -> pure x
+eval (ArrC ArrCell{..}) = do
+    inds <- mapM eval index
+    Just var <- gets (findVar arr)
+    return $ foldl' (\(Arr a) (Number i) -> a !! i) var inds
+eval (ArrLit exps) = Arr <$> mapM eval exps
 eval (Neg e)       = do
     Number x <- eval e
     pure $ Number (negate x)

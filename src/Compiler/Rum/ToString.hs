@@ -2,6 +2,8 @@
 
 module Compiler.Rum.ToString where
 
+import Data.List (intercalate)
+
 import Compiler.Rum.Structure
 
 tab :: Int -> String
@@ -14,7 +16,8 @@ progToStr n (x1:x2:xs) = stmtToStr n x1 ++ ";" ++ progToStr n (x2:xs)
 
 
 stmtToStr :: Int -> Statement -> String
-stmtToStr n Assignment{..}  = tab n ++ name var ++ " := " ++ exprToStr value
+stmtToStr n AssignmentVar{..}  = tab n ++ name var ++ " := " ++ exprToStr value
+stmtToStr n AssignmentArr{..}  = tab n ++ arrCellToStr arrC ++ " := " ++ exprToStr value
 stmtToStr n Skip            = tab n ++ "skip "
 stmtToStr n IfElse{..}      = tab n ++ "if"   ++ tab (succ n) ++ exprToStr ifCond ++
                               tab n ++ "then" ++ progToStr (succ n) trueAct ++
@@ -39,12 +42,17 @@ stmtToStr n (FunCallStmt f) = tab n ++ funCallToStr f
 
 exprToStr :: Expression -> String
 exprToStr (Const c)     = typeToStr c
+exprToStr (ArrC arC)    = arrCellToStr arC
+exprToStr (ArrLit lits) = "[" ++ expListStr lits ++ "]"
 exprToStr (Var v)       = name v
 exprToStr (Neg e)       = "-(" ++ exprToStr e ++ ")"
 exprToStr BinOper{..}   = paren l ++ bToStr bop ++ paren r
 exprToStr LogicOper{..} = paren l ++ lToStr lop ++ paren r
 exprToStr CompOper{..}  = paren l ++ cToStr cop ++ paren r
 exprToStr (FunCallExp f)= funCallToStr f
+
+arrCellToStr :: ArrCell -> String
+arrCellToStr ArrCell{..} =  name arr ++ concatMap (\i -> "[" ++ exprToStr i ++ "]") index
 
 funCallToStr :: FunCall -> String
 funCallToStr FunCall{..}   = name fName ++ "(" ++ expListStr args ++ ")"
@@ -53,11 +61,12 @@ typeToStr :: Type -> String
 typeToStr (Number n) = show n
 typeToStr (Ch c)     = show c
 typeToStr (Str s)    = s
+typeToStr (Arr a)    = "[" ++ intercalate ", " (map typeToStr a) ++ "]"
 typeToStr Unit       = "()"
 
 expListStr :: [Expression] -> String
-expListStr [] = ""
-expListStr [x] = exprToStr x
+expListStr []         = ""
+expListStr [x]        = exprToStr x
 expListStr (x1:x2:xs) = exprToStr x1 ++", " ++ expListStr (x2:xs)
 
 paren :: Expression -> String

@@ -1,8 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
--- TODO: поддержать массивы (и все функции с ними)
-
 -- Refactoring
 -- TODO: заменить StateT Environment (MaybeT IO) Type на newtype Interpret a = Interpret { runInterpet :: StateT ... }
 -- TODO: toString через библиотеку форматирования fmt (красота кода)
@@ -18,7 +16,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 
 
-data Type = Number Int | Ch Char | Str String | Unit deriving (Show, Eq, Ord)
+data Type = Number Int | Ch Char | Str String | Arr [Type] | Unit deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
 
@@ -27,10 +25,12 @@ data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show)
 data LogicOp = And | Or | Xor deriving (Show)
 
 newtype Variable = Variable {name :: String} deriving (Show, Eq, Ord, Hashable)
-
+data ArrCell  = ArrCell {arr :: Variable, index :: [Expression]} deriving (Show)
 data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
                 | Var   Variable
+                | ArrC  ArrCell
+                | ArrLit [Expression]
                 | Neg   Expression
                 | BinOper   {bop :: BinOp,   l, r :: Expression}
                 | CompOper  {cop :: CompOp,  l, r :: Expression}
@@ -38,7 +38,8 @@ data Expression = Const Type
                 | FunCallExp FunCall
                 deriving (Show)
 
-data Statement  = Assignment  {var :: Variable, value :: Expression}
+data Statement  = AssignmentVar {var :: Variable, value :: Expression}
+                | AssignmentArr {arrC :: ArrCell, value :: Expression}
                 | FunCallStmt FunCall
                 | Skip
                 | IfElse      {ifCond    :: Expression, trueAct, falseAct :: Program}
@@ -60,6 +61,16 @@ data Environment = Env {varEnv :: VarEnv, funEnv :: FunEnv, isReturn :: Bool}
 
 updateVars :: Variable -> Type -> Environment ->  Environment
 updateVars v val env@Env{..} = env {varEnv = HM.insert v val varEnv}
+
+updateArrs :: Variable -> [Type] -> Type -> Environment ->  Environment
+updateArrs v inds val env@Env{..} =
+    let Just arr = HM.lookup v varEnv in
+    env {varEnv = HM.insert v (Arr (setArrsCell inds val arr)) varEnv}
+
+setArrsCell :: [Type] -> Type -> Type -> [Type]
+setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ (x:rest)
+setArrsCell (Number i:is) x (Arr ar) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr (setArrsCell is x cur):rest)
+setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
 updateFuns :: Variable -> [Variable] -> ([Type] -> MyStateT) -> Environment -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
