@@ -5,6 +5,8 @@ import           Control.Monad.Trans       (liftIO)
 import           Data.Char                 (ord)
 import qualified Data.HashMap.Strict as HM (fromList)
 import           Data.List                 (intercalate)
+import           Data.Monoid ((<>))
+import qualified Data.Text as T
 import           Text.Read                 (readMaybe)
 
 
@@ -15,19 +17,19 @@ import           Compiler.Rum.Structure
 -----------------------
 
 preludeLibrary :: FunEnv
-preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
-                             , (Variable "write",   ([], writeFun))
-                             , (Variable "strlen",  ([], strlen))
-                             , (Variable "strget",  ([], strget))
-                             , (Variable "strsub",  ([], strsub))
-                             , (Variable "strdup",  ([], strdup))
-                             , (Variable "strset",  ([], strset))
-                             , (Variable "strcat",  ([], strcat))
-                             , (Variable "strcmp",  ([], strcmp))
-                             , (Variable "strmake", ([], strmake))
-                             , (Variable "arrlen",  ([], arrlen))
-                             , (Variable "arrmake", ([], arrmake))
-                             , (Variable "Arrmake", ([], arrmake))
+preludeLibrary = HM.fromList [ ("read",    ([], readFun))
+                             , ("write",   ([], writeFun))
+                             , ("strlen",  ([], strlen))
+                             , ("strget",  ([], strget))
+                             , ("strsub",  ([], strsub))
+                             , ("strdup",  ([], strdup))
+                             , ("strset",  ([], strset))
+                             , ("strcat",  ([], strcat))
+                             , ("strcmp",  ([], strcmp))
+                             , ("strmake", ([], strmake))
+                             , ("arrlen",  ([], arrlen))
+                             , ("arrmake", ([], arrmake))
+                             , ("Arrmake", ([], arrmake))
                              ]
   where
     readFun :: [Type] -> InterpretT
@@ -43,7 +45,7 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
             typeToInt :: Type -> String
             typeToInt (Number n) = show n
             typeToInt (Ch c)     = show $ ord c
-            typeToInt (Str s)    = s
+            typeToInt (Str s)    = T.unpack s
             typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
             typeToInt Unit       = "()"
     writeFun _ = error "Paste Several arggs to write function"
@@ -52,15 +54,15 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     -- String Functions --
     ----------------------
     strlen :: [Type] -> InterpretT
-    strlen [Str s] = return (Number $ length s)
+    strlen [Str s] = return (Number $ T.length s)
     strlen _       = error "strlen() can be only applied to Strings"
 
     strget :: [Type] -> InterpretT
-    strget [Str s, Number i] = return (Ch $ s !! i)
+    strget [Str s, Number i] = return (Ch $ T.index s i)
     strget _                 = error "strget() params should be (String, Int)"
 
     strsub :: [Type] -> InterpretT
-    strsub [Str s, Number from, Number n] = return (Str (take n (drop from s)))
+    strsub [Str s, Number from, Number n] = return (Str (T.take n (T.drop from s)))
     strsub _ = error "strsub() params should be (String, Int, Int)"
 
     strdup :: [Type] -> InterpretT
@@ -69,12 +71,12 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
 
     strset :: [Type] -> InterpretT
     strset [Str s, Number i, Ch c] =
-        let (beg, _:rest) = splitAt i s in
-        return (Str $ beg ++ (c:rest))
+        let (beg, rest) = T.splitAt i s in
+        return (Str $ beg <> T.cons c (T.tail rest))
     strset _ = error "strset() params should be (String, Int, Char)"
 
     strcat :: [Type] -> InterpretT
-    strcat [Str s, Str d] = return (Str $ s ++ d)
+    strcat [Str s, Str d] = return (Str $ s <> d)
     strcat _ = error "strcat() can be only applied to Strings"
 
     strcmp :: [Type] -> InterpretT
@@ -85,8 +87,8 @@ preludeLibrary = HM.fromList [ (Variable "read",    ([], readFun))
     strcmp _ = error "strcmp() can be only applied to Strings"
 
     strmake :: [Type] -> InterpretT
-    strmake [Number n, Ch ch] = return $ Str $ replicate n ch
-    strmake _ = error "strmake() errorparams should be (Int, Char)"
+    strmake [Number n, Ch ch] = return $ Str $ T.replicate n (T.singleton ch)
+    strmake _ = error "strmake() error: params should be (Int, Char)"
 
     ----------------------
     -- Array Functions --

@@ -24,6 +24,7 @@ library
                      , hashable
                      , megaparsec
                      , mtl
+                     , text
                      , transformers
                      , unordered-containers
   default-extensions: OverloadedStrings
@@ -38,6 +39,7 @@ executable Compiler
                      , Compiler
                      , megaparsec
                      , mtl
+                     , text
                      , transformers
   default-extensions: OverloadedStrings
   default-language:    Haskell2010

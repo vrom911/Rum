@@ -1,5 +1,6 @@
 module Main where
 
+import qualified Data.Text.IO as TIO
 import System.Environment        (getArgs)
 import Text.Megaparsec           (parse)
 
@@ -19,7 +20,7 @@ main = do
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
 run fileName f = do
-    prog <- readFile fileName
+    prog <- TIO.readFile fileName
     let statements = parse progP "" prog
     case statements of
         Left err -> error (show err)
@@ -29,7 +30,7 @@ test :: [Statement] -> IO ()
 test p = do
     print p
     interpr p
-    putStrLn $ progToStr 0 p
+    TIO.putStrLn $ progToStr 0 p
 
 interpr :: [Statement] -> IO ()
 interpr p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)

@@ -2,19 +2,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Refactoring
--- TODO: заменить String на Text
 -- TODO: перейти на lens
 
 module Compiler.Rum.Structure where
 
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)
+import           Data.String (IsString, fromString)
+import           Data.Text (Text)
+import qualified Data.Text as T
 import           Control.Applicative
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
 
 
-data Type = Number Int | Ch Char | Str String | Arr [Type] | Unit deriving (Show, Eq, Ord)
+data Type = Number Int | Ch Char | Str Text | Arr [Type] | Unit deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
 
@@ -22,7 +24,11 @@ data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show)
 
 data LogicOp = And | Or | Xor deriving (Show)
 
-newtype Variable = Variable {name :: String} deriving (Show, Eq, Ord, Hashable)
+newtype Variable = Variable {name :: Text} deriving (Show, Eq, Ord, Hashable)
+
+instance IsString Variable where
+    fromString = Variable . T.pack
+
 data ArrCell  = ArrCell {arr :: Variable, index :: [Expression]} deriving (Show)
 data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
