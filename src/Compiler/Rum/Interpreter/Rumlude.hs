@@ -1,4 +1,4 @@
-module Compiler.Rum.Rumlude where
+module Compiler.Rum.Interpreter.Rumlude where
 
 import           Control.Applicative       (empty)
 import           Control.Monad.Trans       (liftIO)
@@ -10,7 +10,7 @@ import qualified Data.Text as T
 import           Text.Read                 (readMaybe)
 
 
-import           Compiler.Rum.Structure
+import           Compiler.Rum.Internal.AST
 
 -----------------------
 ---- Default Funcs ----

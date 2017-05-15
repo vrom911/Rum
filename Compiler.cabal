@@ -15,11 +15,12 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Compiler.Rum.Interpreter
-                     , Compiler.Rum.Parser
-                     , Compiler.Rum.Rumlude
-                     , Compiler.Rum.Structure
-                     , Compiler.Rum.ToString
+  exposed-modules:     Compiler.Rum.Interpreter.Rummer
+                       Compiler.Rum.Internal.Parser
+                       Compiler.Rum.Interpreter.Rumlude
+                       Compiler.Rum.Internal.AST
+                       Compiler.Rum.Internal.ToString
+                       Compiler.Rum.StackMachine.Structure
   build-depends:       base >= 4.7 && < 5
                      , hashable
                      , megaparsec
@@ -28,6 +29,7 @@ library
                      , transformers
                      , unordered-containers
   default-extensions: OverloadedStrings
+                      RecordWildCards
   default-language:    Haskell2010
   ghc-options:         -Wall
 

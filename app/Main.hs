@@ -4,11 +4,11 @@ import qualified Data.Text.IO as TIO
 import System.Environment        (getArgs)
 import Text.Megaparsec           (parse)
 
-import Compiler.Rum.Interpreter
-import Compiler.Rum.Parser
-import Compiler.Rum.Rumlude
-import Compiler.Rum.Structure
-import Compiler.Rum.ToString
+import Compiler.Rum.Interpreter.Rummer
+import Compiler.Rum.Internal.Parser
+import Compiler.Rum.Interpreter.Rumlude
+import Compiler.Rum.Internal.AST
+import Compiler.Rum.Internal.ToString
 
 main :: IO ()
 main = do

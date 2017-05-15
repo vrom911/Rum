@@ -1,11 +1,11 @@
-module Compiler.Rum.ExprParser where
+module Compiler.Rum.Internal.ExprParser where
 
 import qualified Data.HashMap.Strict as HM
 import           Data.List (foldl')
 import           Text.Megaparsec
 import           Text.Megaparsec.String
 
-import           Compiler.Rum.Structure
+import           Compiler.Rum.Internal.AST
 
 strSpace :: String -> Parser String
 strSpace s = string s >>= \x -> space >> return x

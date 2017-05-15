@@ -1,4 +1,4 @@
-module Compiler.Rum.Parser where
+module Compiler.Rum.Internal.Parser where
 
 
 import           Control.Applicative    ((<|>), liftA2)
@@ -13,7 +13,7 @@ import Text.Megaparsec        ( anyChar, alphaNumChar, between, char
 import Text.Megaparsec.Expr   (Operator(..), makeExprParser)
 import Text.Megaparsec.Text (Parser)
 
-import Compiler.Rum.Structure
+import Compiler.Rum.Internal.AST
 
 text :: String -> Parser Text
 text t = T.pack <$> string t
@@ -124,7 +124,7 @@ basicExprP =   parens arithmeticExprP
            <|> ArrLit         <$> (arrP <|> emptyArrP)
            <|> varArrFuncallNameP
 
-arithmeticExprP, exprP:: Parser Expression
+arithmeticExprP, exprP :: Parser Expression
 arithmeticExprP = makeExprParser basicExprP aOperators
 exprP           = arithmeticExprP
 
@@ -188,8 +188,8 @@ stmtP =   parens stmtP
     forP :: Parser Statement
     forP = do
         s <- keyword "for" *> progMainP
-        e <- txtSpace ","   *> exprP
-        u <- txtSpace ","   *> progMainP
+        e <- txtSpace ","  *> exprP
+        u <- txtSpace ","  *> progMainP
         b <- betweenDo progMainP
         return $ For s e u b
 

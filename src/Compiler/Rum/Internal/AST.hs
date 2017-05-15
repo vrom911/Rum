@@ -1,10 +1,9 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- Refactoring
 -- TODO: перейти на lens
 
-module Compiler.Rum.Structure where
+module Compiler.Rum.Internal.AST where
 
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)

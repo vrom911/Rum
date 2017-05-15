@@ -1,12 +1,10 @@
-{-# LANGUAGE RecordWildCards #-}
-
-module Compiler.Rum.ToString where
+module Compiler.Rum.Internal.ToString where
 
 import           Data.Monoid ((<>))
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import Compiler.Rum.Structure
+import Compiler.Rum.Internal.AST
 
 tab :: Int -> Text
 tab n = T.cons '\n' (T.replicate (2*n) " ")

@@ -1,6 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
-
-module Compiler.Rum.Interpreter where
+module Compiler.Rum.Interpreter.Rummer where
 
 import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State
@@ -8,7 +6,7 @@ import           Data.Bool                 (bool)
 import           Data.List                 (foldl')
 import qualified Data.HashMap.Strict as HM (fromList, union)
 
-import           Compiler.Rum.Structure
+import           Compiler.Rum.Internal.AST
 
 interpret :: Program -> InterpretT
 interpret [] = return Unit
