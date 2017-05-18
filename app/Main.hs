@@ -1,5 +1,6 @@
 module Main where
 
+import Control.Monad.State
 import qualified Data.Text.IO as TIO
 import System.Environment        (getArgs)
 import Text.Megaparsec           (parse)
@@ -9,6 +10,7 @@ import Compiler.Rum.Internal.Parser
 import Compiler.Rum.Interpreter.Rumlude
 import Compiler.Rum.Internal.AST
 import Compiler.Rum.Internal.ToString
+import Compiler.Rum.StackMachine.Stacker
 
 main :: IO ()
 main = do
@@ -16,6 +18,7 @@ main = do
     case opt of
         "-t" -> run "prog.expr" test
         "-i" -> run (head cmdArgs) interpr
+        "-s" -> run "prog.expr" stack
         _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
@@ -34,3 +37,8 @@ test p = do
 
 interpr :: [Statement] -> IO ()
 interpr p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)
+
+stack :: Program -> IO ()
+stack p = do
+    print p
+    print $ evalState (translateP p) 0
