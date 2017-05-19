@@ -22,7 +22,8 @@ library
                        Compiler.Rum.Internal.ToString
                        Compiler.Rum.StackMachine.Stacker
                        Compiler.Rum.StackMachine.Structure
-                       Compiler.Rum.StackMachine.SMUtil
+                       Compiler.Rum.StackMachine.Translator
+                       Compiler.Rum.StackMachine.Util
   build-depends:       base >= 4.7 && < 5
                      , hashable
                      , extra
@@ -45,7 +46,6 @@ executable Compiler
                      , Compiler
                      , megaparsec
                      , mtl
-                     , safe
                      , text
                      , transformers
   default-extensions: OverloadedStrings

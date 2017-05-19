@@ -41,13 +41,7 @@ preludeLibrary = HM.fromList [ ("read",    ([], readFun))
 --        liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
         liftIO $ putStrLn $ typeToInt x  -- res ?: error "writeln error"
         return Unit
-          where
-            typeToInt :: Type -> String
-            typeToInt (Number n) = show n
-            typeToInt (Ch c)     = show $ ord c
-            typeToInt (Str s)    = T.unpack s
-            typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
-            typeToInt Unit       = "()"
+
     writeFun _ = error "Paste Several arggs to write function"
 
     ----------------------
@@ -102,3 +96,9 @@ preludeLibrary = HM.fromList [ ("read",    ([], readFun))
     arrmake _       = error "arrmake() wrong params"
 
 
+typeToInt :: Type -> String
+typeToInt (Number n) = show n
+typeToInt (Ch c)     = show $ ord c
+typeToInt (Str s)    = T.unpack s
+typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
+typeToInt Unit       = "()"

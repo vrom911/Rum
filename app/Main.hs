@@ -1,6 +1,7 @@
 module Main where
 
 import Control.Monad.State
+import Control.Monad.Trans.Reader
 import qualified Data.Text.IO as TIO
 import System.Environment        (getArgs)
 import Text.Megaparsec           (parse)
@@ -10,15 +11,19 @@ import Compiler.Rum.Internal.Parser
 import Compiler.Rum.Interpreter.Rumlude
 import Compiler.Rum.Internal.AST
 import Compiler.Rum.Internal.ToString
+import Compiler.Rum.StackMachine.Translator
 import Compiler.Rum.StackMachine.Stacker
+import Compiler.Rum.StackMachine.Structure
+import Compiler.Rum.StackMachine.Util
 
 main :: IO ()
 main = do
     progArgs@(opt:cmdArgs) <- getArgs  -- [opt, file] <- getArgs
     case opt of
-        "-t" -> run "prog.expr" test
+        "-it" -> run "prog.expr" test
+        "-st" -> run "prog.expr" stackTest
         "-i" -> run (head cmdArgs) interpr
-        "-s" -> run "prog.expr" stack
+        "-s" -> run (head cmdArgs) stackRun
         _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
@@ -38,7 +43,14 @@ test p = do
 interpr :: [Statement] -> IO ()
 interpr p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)
 
-stack :: Program -> IO ()
-stack p = do
+stackRun :: Program -> IO ()
+stackRun p = do
+    let instrs = evalState (translateP p) 0
+    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
+
+stackTest :: Program -> IO ()
+stackTest p = do
     print p
-    print $ evalState (translateP p) 0
+    let instrs = evalState (translateP p) 0
+    print instrs
+    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
