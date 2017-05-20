@@ -1,19 +1,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -- Refactoring
 -- TODO: перейти на lens
 
 module Compiler.Rum.Internal.AST where
 
+import           Data.Bool                 (bool)
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)
-import           Data.String (IsString, fromString)
-import           Data.Text (Text)
+import           Data.String               (IsString, fromString)
+import           Data.Text                 (Text)
 import qualified Data.Text as T
 import           Control.Applicative
 import           Control.Monad.State
 import           Control.Monad.Trans.Maybe
-
+import           GHC.Generics              (Generic)
 
 data Type = Number Int | Ch Char | Str Text | Arr [Type] | Unit deriving (Show, Eq, Ord)
 
@@ -33,7 +35,7 @@ data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
                 | Var   Variable
                 | ArrC  ArrCell
-                | ArrLit [Expression]
+                | ArrLit [Expression] -- for [ a, b, c ]
                 | Neg   Expression
                 | BinOper   {bop :: BinOp,   l, r :: Expression}
                 | CompOper  {cop :: CompOp,  l, r :: Expression}
@@ -54,6 +56,13 @@ data Statement  = AssignmentVar {var :: Variable, value :: Expression}
                 deriving (Show)
 
 type Program    = [Statement]
+
+data RumludeFunName = Read   | Write
+                    | Strlen | Strget | Strsub | Strdup | Strset | Strcat | Strcmp | Strmake
+                    | Arrlen | Arrmake
+                    deriving (Show, Eq, Ord, Generic)
+instance Hashable RumludeFunName
+
 -------------------------
 --- Environment Stuff ---
 -------------------------
@@ -148,4 +157,5 @@ _ -|- _ = 1
 (-!-) :: Int -> Int -> Int
 (-!-) = (-|-)
 
-
+intCompare :: CompOp -> Type -> Type -> Type
+intCompare c x y = Number $ bool 0 1 $ compOp c x y

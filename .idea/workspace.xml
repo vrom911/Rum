@@ -2,11 +2,15 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a6c7fc33-35ed-4127-b016-4b19b134279e" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/compiler-tests" afterPath="$PROJECT_DIR$/compiler-tests" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/Compiler.cabal" afterPath="$PROJECT_DIR$/Compiler.cabal" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Util.hs" afterPath="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Util.hs" />
     </list>
     <ignored path="$PROJECT_DIR$/.ideaHaskellLib/" />
@@ -22,61 +26,41 @@
   <component name="ExecutionTargetManager" SELECTED_TARGET="default_target" />
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="AST.hs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="180">
-              <caret line="61" column="90" lean-forward="false" selection-start-line="59" selection-start-column="0" selection-end-line="61" selection-end-column="90" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="Structure.hs" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="300">
-              <caret line="40" column="29" lean-forward="true" selection-start-line="40" selection-start-column="29" selection-end-line="40" selection-end-column="29" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="Rumlude.hs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="558">
-              <caret line="31" column="0" lean-forward="true" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+            <state relative-caret-position="-3">
+              <caret line="38" column="30" lean-forward="false" selection-start-line="38" selection-start-column="30" selection-end-line="39" selection-end-column="23" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Util.hs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Util.hs">
+      <file leaf-file-name="AST.hs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="336">
-              <caret line="92" column="48" lean-forward="false" selection-start-line="92" selection-start-column="48" selection-end-line="92" selection-end-column="48" />
+            <state relative-caret-position="483">
+              <caret line="158" column="0" lean-forward="true" selection-start-line="158" selection-start-column="0" selection-end-line="158" selection-end-column="0" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Rumlude.hs" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs">
+      <file leaf-file-name="Rummer.hs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="192">
-              <caret line="36" column="0" lean-forward="true" selection-start-line="36" selection-start-column="0" selection-end-line="36" selection-end-column="0" />
+            <state relative-caret-position="462">
+              <caret line="71" column="35" lean-forward="false" selection-start-line="71" selection-start-column="35" selection-end-line="71" selection-end-column="35" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Stacker.hs" pinned="false" current-in-tab="false">
+      <file leaf-file-name="Stacker.hs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="288">
-              <caret line="16" column="0" lean-forward="false" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
+            <state relative-caret-position="339">
+              <caret line="43" column="67" lean-forward="true" selection-start-line="43" selection-start-column="67" selection-end-line="43" selection-end-column="67" />
               <folding />
             </state>
           </provider>
@@ -85,38 +69,18 @@
       <file leaf-file-name="Translator.hs" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="192">
-              <caret line="74" column="22" lean-forward="false" selection-start-line="74" selection-start-column="12" selection-end-line="74" selection-end-column="22" />
+            <state relative-caret-position="-597">
+              <caret line="25" column="37" lean-forward="false" selection-start-line="25" selection-start-column="29" selection-end-line="25" selection-end-column="37" />
               <folding />
             </state>
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="Compiler.cabal" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/Compiler.cabal">
+      <file leaf-file-name="Rumlude.hs" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="105">
-              <caret line="21" column="52" lean-forward="false" selection-start-line="21" selection-start-column="52" selection-end-line="21" selection-end-column="52" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="test027.expr" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/compiler-tests/core/test027.expr">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="198">
-              <caret line="20" column="0" lean-forward="false" selection-start-line="20" selection-start-column="0" selection-end-line="20" selection-end-column="0" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="prog.expr" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/prog.expr">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="108">
-              <caret line="6" column="17" lean-forward="false" selection-start-line="6" selection-start-column="17" selection-end-line="6" selection-end-column="17" />
+            <state relative-caret-position="447">
+              <caret line="35" column="17" lean-forward="false" selection-start-line="35" selection-start-column="17" selection-end-line="35" selection-end-column="17" />
               <folding />
             </state>
           </provider>
@@ -149,6 +113,9 @@
       <find>Variabl</find>
       <find>Var</find>
       <find>Variable</find>
+      <find>arrP</find>
+      <find>ArrC</find>
+      <find>findSV</find>
     </findStrings>
     <replaceStrings>
       <replace>&lt;&gt;</replace>
@@ -204,19 +171,19 @@
         <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/ToString.hs" />
         <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/ExprParser.hs" />
         <option value="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Interpreter.hs" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs" />
         <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/SMUtil.hs" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs" />
         <option value="$PROJECT_DIR$/prog.expr" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs" />
         <option value="$PROJECT_DIR$/compiler-tests/core/Makefile" />
         <option value="$PROJECT_DIR$/app/Main.hs" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs" />
         <option value="$PROJECT_DIR$/Compiler.cabal" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs" />
         <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Util.hs" />
-        <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs" />
         <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs" />
+        <option value="$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs" />
       </list>
     </option>
   </component>
@@ -247,6 +214,8 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scratches" />
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <PATH>
@@ -278,6 +247,10 @@
             </PATH_ELEMENT>
             <PATH_ELEMENT>
               <option name="myItemId" value="Rum" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="StackMachine" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -350,8 +323,6 @@
         </subPane>
       </pane>
       <pane id="PackagesPane" />
-      <pane id="Scratches" />
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -807,7 +778,8 @@
       <workItem from="1495017257065" duration="12403000" />
       <workItem from="1495041354441" duration="8983000" />
       <workItem from="1495147555723" duration="6201000" />
-      <workItem from="1495191915929" duration="30641000" />
+      <workItem from="1495191915929" duration="39584000" />
+      <workItem from="1495311648895" duration="1218000" />
     </task>
     <task id="LOCAL-00001" summary="Add rc.sh and make tests work">
       <created>1494432360345</created>
@@ -900,11 +872,18 @@
       <option name="project" value="LOCAL" />
       <updated>1495229225171</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="Add Rumlude String funs">
+      <created>1495288876687</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1495288876688</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="207869000" />
+    <option name="totallyTimeSpent" value="218030000" />
   </component>
   <component name="TodoView" selected-index="4">
     <todo-panel id="selected-file">
@@ -931,10 +910,10 @@
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Leiningen" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Properties" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
-      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.32589287" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.3249258" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Capture Tool" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Designer" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.1849315" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.18797565" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="Database" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.24961948" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -1026,7 +1005,8 @@
     <MESSAGE value="Big Renaming" />
     <MESSAGE value="Add Stack Structure &amp; translator" />
     <MESSAGE value="Add Stack executor" />
-    <option name="LAST_COMMIT_MESSAGE" value="Add Stack executor" />
+    <MESSAGE value="Add Rumlude String funs" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add Rumlude String funs" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager />
@@ -1257,13 +1237,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/compiler-tests/core/test029.expr">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="324">
-          <caret line="18" column="12" lean-forward="false" selection-start-line="18" selection-start-column="5" selection-end-line="18" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/stack.yaml">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="1026">
@@ -1287,14 +1260,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/Parser.hs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="0">
-          <caret line="0" column="21" lean-forward="false" selection-start-line="0" selection-start-column="21" selection-end-line="0" selection-end-column="21" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/ToString.hs">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="18">
@@ -1311,19 +1276,10 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="300">
-          <caret line="86" column="39" lean-forward="false" selection-start-line="86" selection-start-column="23" selection-end-line="86" selection-end-column="39" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/compiler-tests/core/test027.expr">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="198">
           <caret line="20" column="0" lean-forward="false" selection-start-line="20" selection-start-column="0" selection-end-line="20" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -1331,7 +1287,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="162">
           <caret line="9" column="30" lean-forward="false" selection-start-line="9" selection-start-column="30" selection-end-line="9" selection-end-column="30" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -1339,23 +1294,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="108">
           <caret line="6" column="17" lean-forward="false" selection-start-line="6" selection-start-column="17" selection-end-line="6" selection-end-column="17" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="180">
-          <caret line="61" column="90" lean-forward="false" selection-start-line="59" selection-start-column="0" selection-end-line="61" selection-end-column="90" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="288">
-          <caret line="16" column="0" lean-forward="false" selection-start-line="16" selection-start-column="0" selection-end-line="16" selection-end-column="0" />
-          <folding />
         </state>
       </provider>
     </entry>
@@ -1363,46 +1301,85 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="105">
           <caret line="21" column="52" lean-forward="false" selection-start-line="21" selection-start-column="52" selection-end-line="21" selection-end-column="52" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="339">
+          <caret line="39" column="17" lean-forward="false" selection-start-line="39" selection-start-column="17" selection-end-line="39" selection-end-column="17" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs">
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/Parser.hs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="192">
-          <caret line="36" column="0" lean-forward="true" selection-start-line="36" selection-start-column="0" selection-end-line="36" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="558">
-          <caret line="31" column="0" lean-forward="true" selection-start-line="31" selection-start-column="0" selection-end-line="31" selection-end-column="0" />
+        <state relative-caret-position="131">
+          <caret line="58" column="36" lean-forward="false" selection-start-line="58" selection-start-column="32" selection-end-line="58" selection-end-column="36" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Util.hs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="336">
-          <caret line="92" column="48" lean-forward="false" selection-start-line="92" selection-start-column="48" selection-end-line="92" selection-end-column="48" />
+        <state relative-caret-position="-21">
+          <caret line="21" column="54" lean-forward="false" selection-start-line="21" selection-start-column="38" selection-end-line="21" selection-end-column="54" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/compiler-tests/core/test029.expr">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="324">
+          <caret line="18" column="12" lean-forward="false" selection-start-line="18" selection-start-column="5" selection-end-line="18" selection-end-column="12" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/Rumlude.hs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-3">
+          <caret line="38" column="30" lean-forward="false" selection-start-line="38" selection-start-column="30" selection-end-line="39" selection-end-column="23" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Translator.hs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="192">
-          <caret line="74" column="22" lean-forward="false" selection-start-line="74" selection-start-column="12" selection-end-line="74" selection-end-column="22" />
+        <state relative-caret-position="-597">
+          <caret line="25" column="37" lean-forward="false" selection-start-line="25" selection-start-column="29" selection-end-line="25" selection-end-column="37" />
           <folding />
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Structure.hs">
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rumlude.hs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="300">
-          <caret line="40" column="29" lean-forward="true" selection-start-line="40" selection-start-column="29" selection-end-line="40" selection-end-column="29" />
+        <state relative-caret-position="447">
+          <caret line="35" column="17" lean-forward="false" selection-start-line="35" selection-start-column="17" selection-end-line="35" selection-end-column="17" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Internal/AST.hs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="483">
+          <caret line="158" column="0" lean-forward="true" selection-start-line="158" selection-start-column="0" selection-end-line="158" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/Interpreter/Rummer.hs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="462">
+          <caret line="71" column="35" lean-forward="false" selection-start-line="71" selection-start-column="35" selection-end-line="71" selection-end-column="35" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/src/Compiler/Rum/StackMachine/Stacker.hs">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="339">
+          <caret line="43" column="67" lean-forward="true" selection-start-line="43" selection-start-column="67" selection-end-line="43" selection-end-column="67" />
           <folding />
         </state>
       </provider>

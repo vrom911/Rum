@@ -10,7 +10,7 @@ import           Data.Hashable             (Hashable)
 import           Data.String               (IsString, fromString)
 import           Data.Text                 (Text)
 import qualified Data.Text as T
-import GHC.Generics (Generic)
+import           GHC.Generics              (Generic)
 
 import Compiler.Rum.Internal.AST
 
@@ -18,12 +18,6 @@ newtype LabelId = LabelId Text deriving (Show, Eq, Ord, Generic)
 instance Hashable LabelId
 instance IsString LabelId where
     fromString = LabelId . T.pack
-
-data RumludeFunName = SRead  | SWrite
-                    | Strlen | Strget | Strsub | Strdup | Strset | Strcat | Strcmp | Strmake
-                    | Arrlen | Arrmake
-                    deriving (Show, Eq, Ord, Generic)
-instance Hashable RumludeFunName
 
 data Instruction = Nop       -- No operation
                  | SBinOp BinOp
@@ -40,7 +34,10 @@ data Instruction = Nop       -- No operation
                  | SFunCall LabelId Int    -- Call a function
                  | SReturn       -- Return from a function
                  | SRumludeCall RumludeFunName  -- Call function from standard library
-               deriving (Show)
+                 | PushNArr Int
+                 | LoadArr Variable Int
+                 | StoreArr Variable Int
+                 deriving (Show)
 
 type Instructions = State Int [Instruction]
 type Labels = HM.HashMap LabelId Int

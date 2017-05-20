@@ -68,12 +68,8 @@ eval LogicOper{..} = do
     Number left <- eval l
     Number right <- eval r
     pure $ Number (logicOp lop left right)
-eval CompOper{..}  = liftA2 intCompare (eval l) (eval r)
-  where
-    intCompare :: Type -> Type -> Type
-    intCompare x y = Number $ bool 0 1 $ compOp cop x y
+eval CompOper{..}  = liftA2 (intCompare cop) (eval l) (eval r)
 eval (FunCallExp f) = evalFunCall f
-
 
 
 evalFunCall :: FunCall -> InterpretT

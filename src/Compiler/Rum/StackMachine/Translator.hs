@@ -4,6 +4,7 @@ import           Control.Monad.Extra       (concatMapM)
 import qualified Data.HashMap.Strict as HM
 
 import Compiler.Rum.Internal.AST
+import Compiler.Rum.Internal.Rumlude
 import Compiler.Rum.StackMachine.Structure
 import Compiler.Rum.StackMachine.Util
 
@@ -20,6 +21,9 @@ translate = concatMapM translateStmt
 translateStmt :: Statement -> Instructions
 translateStmt Skip = pure [Nop]
 translateStmt AssignmentVar{..} = translateExpr value >>= \x -> pure $ x ++ [Store var]
+translateStmt AssignmentArr{..} = translateExpr value >>= \x ->
+    concatMapM translateExpr (index arrC) >>= \inds ->
+        pure $ x ++ inds ++ [StoreArr (arr arrC) (length $ index arrC) ]
 translateStmt IfElse{..} = do
     lblTrue <- newLabel
     lblFalse <- newLabel
@@ -55,17 +59,20 @@ translateStmt Return{..} = translateExpr retExp >>= \ret -> pure $ ret ++ [SRetu
 translateStmt Fun {..} = translate funBody >>= \f ->
     pure $ (Label $ LabelId $ name funName) : map Store (reverse params) ++ f
 translateStmt (FunCallStmt f) = translateFunCall f
-translateStmt e = error $ "Not supported operation for stack: " ++ show e
+--translateStmt e = error $ "Not supported operation for stack: " ++ show e
 
 translateExpr :: Expression -> Instructions
 translateExpr (Const x)     = pure [Push x]
 translateExpr (Var v)       = pure [Load v]
+translateExpr (ArrC ArrCell{..}) = concatMapM translateExpr index >>= \indexes ->
+    pure $ indexes ++ [LoadArr arr $ length indexes]
+translateExpr (ArrLit exps) = concatMapM translateExpr exps >>= \ins -> pure $ ins ++ [PushNArr $ length exps]
 translateExpr BinOper{..}   = translateExpr l >>= \x -> translateExpr r >>= \y -> pure $ x ++ y ++ [SBinOp bop]
 translateExpr CompOper{..}  = translateExpr l >>= \x -> translateExpr r >>= \y -> pure $ x ++ y ++ [SCompOp cop]
 translateExpr LogicOper{..} = translateExpr l >>= \x -> translateExpr r >>= \y -> pure $ x ++ y ++ [SLogicOp lop]
 translateExpr (Neg e) = translateExpr e >>= \x -> pure $ Push (Number 0) : x ++ [SBinOp Sub]
 translateExpr (FunCallExp f) = translateFunCall f
-translateExpr e = error $ "Not supported operation for stack: " ++ show e
+--translateExpr e = error $ "Not supported operation for stack: " ++ show e
 
 -- f :: a -> m b
 -- l :: [a]
