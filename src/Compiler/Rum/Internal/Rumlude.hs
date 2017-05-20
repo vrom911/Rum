@@ -4,12 +4,11 @@ import           Control.Monad.Trans       (MonadIO, liftIO)
 import           Data.Char                 (ord)
 import qualified Data.HashMap.Strict as HM (HashMap, fromList)
 import           Data.List                 (intercalate)
-import           Data.Monoid ((<>))
+import           Data.Monoid               ((<>))
 import qualified Data.Text as T
 
-
-import Compiler.Rum.Internal.AST
-import Compiler.Rum.StackMachine.Structure
+import           Compiler.Rum.Internal.AST
+import           Compiler.Rum.StackMachine.Structure
 
 rumludeFunNames :: RumludeFunNamesMap
 rumludeFunNames = HM.fromList [ ("read"  , Read ), ("write" , Write)

@@ -1,12 +1,12 @@
 module Compiler.Rum.Interpreter.Rummer where
 
 import           Control.Applicative       (liftA2, empty)
-import           Control.Monad.State
-import           Data.Bool                 (bool)
+import           Control.Monad.State       (get, gets, lift, modify, MonadState)
 import           Data.List                 (foldl')
 import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Internal.AST
+import           Compiler.Rum.Internal.Util
 
 interpret :: Program -> InterpretT
 interpret [] = return Unit
@@ -21,19 +21,19 @@ interpretSt AssignmentArr{..}  = eval value >>= \x -> mapM eval (index arrC)
                                             >>= \inds -> modifyT (updateArrs (arr arrC) inds x)
 interpretSt Skip               = return Unit
 interpretSt IfElse{..}         = eval ifCond >>= \x ->
-    if x == Number 0 then interpret falseAct else interpret trueAct
+    if isFalse x then interpret falseAct else interpret trueAct
 interpretSt st@WhileDo{..}     = do
     c <- eval whileCond
-    whenT (c /= Number 0) $ interpret act >> interpretSt st
+    whenT (isTrue c) $ interpret act >> interpretSt st
 interpretSt st@RepeatUntil{..} = do
     () <$ interpret act
     c <- eval repCond
-    whenT (c == Number 0) $ interpretSt st
+    whenT (isFalse c) $ interpretSt st
 interpretSt For{..} = interpret start *> forDo
   where
     forDo = do
         c <- eval expr
-        whenT (c /= Number 0) $ interpret body >> interpret update >> forDo
+        whenT (isTrue c) $ interpret body >> interpret update >> forDo
 interpretSt Fun{..} = modifyT (updateFuns funName params $ \_ -> interpret funBody)
 interpretSt Return{..} = modify (updateBool True) >> eval retExp
 interpretSt (FunCallStmt f) = evalFunCall f

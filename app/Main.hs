@@ -1,20 +1,21 @@
 module Main where
 
-import Control.Monad.State
-import Control.Monad.Trans.Reader
+import           Control.Monad.State                  (evalState, evalStateT)
+import           Control.Monad.Trans.Reader           (runReaderT)
 import qualified Data.Text.IO as TIO
-import System.Environment        (getArgs)
-import Text.Megaparsec           (parse)
+import           System.Environment                   (getArgs)
+import           Text.Megaparsec                      (parse)
 
-import Compiler.Rum.Interpreter.Rummer
-import Compiler.Rum.Internal.Parser
-import Compiler.Rum.Interpreter.Rumlude
-import Compiler.Rum.Internal.AST
-import Compiler.Rum.Internal.ToString
-import Compiler.Rum.StackMachine.Translator
-import Compiler.Rum.StackMachine.Stacker
-import Compiler.Rum.StackMachine.Structure
-import Compiler.Rum.StackMachine.Util
+import           Compiler.Rum.Interpreter.Rummer      (interpret)
+import           Compiler.Rum.Internal.Parser         (progP)
+import           Compiler.Rum.Interpreter.Rumlude     (preludeLibrary)
+import           Compiler.Rum.Internal.AST            (Environment(..), Program, Statement)
+import           Compiler.Rum.Internal.ToString       (progToStr)
+import           Compiler.Rum.Internal.Util           (runIOInterpret)
+import           Compiler.Rum.StackMachine.Translator (translateP)
+import           Compiler.Rum.StackMachine.Stacker    (stacker)
+import           Compiler.Rum.StackMachine.Structure  (StackEnvironment(..))
+import           Compiler.Rum.StackMachine.Util       (buildLabelsMap, emptyVars)
 
 main :: IO ()
 main = do

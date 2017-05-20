@@ -15,12 +15,13 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Compiler.Rum.Interpreter.Rummer
-                       Compiler.Rum.Internal.Parser
-                       Compiler.Rum.Interpreter.Rumlude
-                       Compiler.Rum.Internal.AST
+  exposed-modules:     Compiler.Rum.Internal.AST
                        Compiler.Rum.Internal.Rumlude
                        Compiler.Rum.Internal.ToString
+                       Compiler.Rum.Internal.Util
+                       Compiler.Rum.Internal.Parser
+                       Compiler.Rum.Interpreter.Rumlude
+                       Compiler.Rum.Interpreter.Rummer
                        Compiler.Rum.StackMachine.Stacker
                        Compiler.Rum.StackMachine.Structure
                        Compiler.Rum.StackMachine.Translator

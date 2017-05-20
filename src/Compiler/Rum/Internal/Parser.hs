@@ -2,16 +2,16 @@ module Compiler.Rum.Internal.Parser where
 
 
 import           Control.Applicative    ((<|>), liftA2)
-import           Data.String (fromString)
-import           Data.Text (Text)
+import           Data.String            (fromString)
+import           Data.Text              (Text)
 import qualified Data.Text as T
-import Text.Megaparsec        ( anyChar, alphaNumChar, between, char
-                              , digitChar, letterChar, many, manyTill
-                              , notFollowedBy, oneOf, option, optional
-                              , sepBy, some, space, string, try
-                              )
-import Text.Megaparsec.Expr   (Operator(..), makeExprParser)
-import Text.Megaparsec.Text (Parser)
+import           Text.Megaparsec        ( anyChar, alphaNumChar, between, char
+                                        , digitChar, letterChar, many, manyTill
+                                        , notFollowedBy, oneOf, option, optional
+                                        , sepBy, some, space, string, try
+                                        )
+import Text.Megaparsec.Expr             (Operator(..), makeExprParser)
+import Text.Megaparsec.Text             (Parser)
 
 import Compiler.Rum.Internal.AST
 
