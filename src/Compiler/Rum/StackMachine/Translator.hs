@@ -57,7 +57,7 @@ translateStmt For{..} = do
 
 translateStmt Return{..} = translateExpr retExp >>= \ret -> pure $ ret ++ [SReturn]
 translateStmt Fun {..} = translate funBody >>= \f ->
-    pure $ (Label $ LabelId $ name funName) : map Store (reverse params) ++ f
+    pure $ (Label $ LabelId $ varName funName) : map Store (reverse params) ++ f
 translateStmt (FunCallStmt f) = translateFunCall f
 --translateStmt e = error $ "Not supported operation for stack: " ++ show e
 
@@ -81,7 +81,7 @@ translateExpr (FunCallExp f) = translateFunCall f
 -- result = concat <$> almostResult
 -- result = concatMapM translateExpr (args call) :: m [Instruction]
 translateFunCall :: FunCall -> Instructions
-translateFunCall FunCall{..} = let funName = name fName in
+translateFunCall FunCall{..} = let funName = varName fName in
     concatMapM translateExpr args >>= \res -> pure $ res ++
         case HM.lookup funName rumludeFunNames of
             Nothing -> [SFunCall (LabelId funName) (length args)]

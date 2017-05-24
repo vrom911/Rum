@@ -1,6 +1,6 @@
 module Main where
 
-import           Control.Monad.State                  (evalState, evalStateT)
+import           Control.Monad.State                  (evalState, evalStateT, void)
 import           Control.Monad.Trans.Reader           (runReaderT)
 import qualified Data.Text.IO as TIO
 import           System.Environment                   (getArgs)
@@ -16,6 +16,9 @@ import           Compiler.Rum.StackMachine.Translator (translateP)
 import           Compiler.Rum.StackMachine.Stacker    (stacker)
 import           Compiler.Rum.StackMachine.Structure  (StackEnvironment(..))
 import           Compiler.Rum.StackMachine.Util       (buildLabelsMap, emptyVars)
+import           Compiler.Rum.Compiler.Emitter
+import           Compiler.Rum.Compiler.CodeGen
+import           Compiler.Rum.Compiler.JIT (runJIT)
 
 main :: IO ()
 main = do
@@ -25,6 +28,7 @@ main = do
         "-st" -> run "prog.expr" stackTest
         "-i" -> run (head cmdArgs) interpr
         "-s" -> run (head cmdArgs) stackRun
+        "-c" -> run (head cmdArgs) (compile $ head cmdArgs)
         _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
@@ -55,3 +59,9 @@ stackTest p = do
     let instrs = evalState (translateP p) 0
     print instrs
     evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
+
+compile :: String -> Program -> IO ()
+compile modName p = do
+    print p
+    () <$ codeGenMaybeWorks modName p
+--    void $ runJIT $ codegenLLVM modName p

@@ -18,13 +18,13 @@ import           GHC.Generics              (Generic)
 
 data Type = Number Int | Ch Char | Str Text | Arr [Type] | Unit deriving (Show, Eq, Ord)
 
-data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show)
+data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show, Eq, Ord)
 
-data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show)
+data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show, Eq, Ord)
 
-data LogicOp = And | Or | Xor deriving (Show)
+data LogicOp = And | Or | Xor deriving (Show, Eq, Ord)
 
-newtype Variable = Variable {name :: Text} deriving (Show, Eq, Ord, Hashable)
+newtype Variable = Variable {varName     :: Text} deriving (Show, Eq, Ord, Hashable)
 
 instance IsString Variable where
     fromString = Variable . T.pack

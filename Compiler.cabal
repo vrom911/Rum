@@ -26,9 +26,15 @@ library
                        Compiler.Rum.StackMachine.Structure
                        Compiler.Rum.StackMachine.Translator
                        Compiler.Rum.StackMachine.Util
+                       Compiler.Rum.Compiler.CodeGen
+                       Compiler.Rum.Compiler.Emitter
+                       Compiler.Rum.Compiler.JIT
   build-depends:       base >= 4.7 && < 5
+                     , containers
                      , hashable
                      , extra
+                     , llvm-hs
+                     , llvm-hs-pure
                      , megaparsec
                      , mtl
                      , safe
@@ -38,7 +44,7 @@ library
   default-extensions: OverloadedStrings
                       RecordWildCards
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall, -fno-warn-unused-do-bind
 
 executable Compiler
   hs-source-dirs:      app

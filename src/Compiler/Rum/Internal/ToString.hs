@@ -16,7 +16,7 @@ progToStr n (x1:x2:xs) = stmtToStr n x1 <> ";" <> progToStr n (x2:xs)
 
 
 stmtToStr :: Int -> Statement -> Text
-stmtToStr n AssignmentVar{..}  = tab n <> name var <> " := " <> exprToStr value
+stmtToStr n AssignmentVar{..}  = tab n <> varName var <> " := " <> exprToStr value
 stmtToStr n AssignmentArr{..}  = tab n <> arrCellToStr arrC <> " := " <> exprToStr value
 stmtToStr n Skip            = tab n <> "skip "
 stmtToStr n IfElse{..}      = tab n <> "if"   <> tab (succ n) <> exprToStr ifCond <>
@@ -34,7 +34,7 @@ stmtToStr n For{..}         = tab n <> "for " <> progToStr (succ n) start <>
                               tab n <> "do"   <> progToStr (succ n) body <>
                               tab n <> "od"
 
-stmtToStr n Fun{..}         = tab n <> "fun " <> name funName <> "(" <> expListStr (Var <$> params) <> ") begin" <>
+stmtToStr n Fun{..}         = tab n <> "fun " <> varName funName <> "(" <> expListStr (Var <$> params) <> ") begin" <>
                               progToStr (succ n) funBody <>
                               tab n <> "end"
 stmtToStr n Return{..}      = tab n <> "return " <> exprToStr retExp
@@ -44,7 +44,7 @@ exprToStr :: Expression -> Text
 exprToStr (Const c)     = typeToStr c
 exprToStr (ArrC arC)    = arrCellToStr arC
 exprToStr (ArrLit lits) = "[" <> expListStr lits <> "]"
-exprToStr (Var v)       = name v
+exprToStr (Var v)       = varName v
 exprToStr (Neg e)       = "-(" <> exprToStr e <> ")"
 exprToStr BinOper{..}   = paren l <> bToStr bop <> paren r
 exprToStr LogicOper{..} = paren l <> lToStr lop <> paren r
@@ -52,10 +52,10 @@ exprToStr CompOper{..}  = paren l <> cToStr cop <> paren r
 exprToStr (FunCallExp f)= funCallToStr f
 
 arrCellToStr :: ArrCell -> Text
-arrCellToStr ArrCell{..} =  name arr <> T.concat (map (\i -> "[" <> exprToStr i <> "]") index)
+arrCellToStr ArrCell{..} =  varName arr <> T.concat (map (\i -> "[" <> exprToStr i <> "]") index)
 
 funCallToStr :: FunCall -> Text
-funCallToStr FunCall{..}   = name fName <> "(" <> expListStr args <> ")"
+funCallToStr FunCall{..}   = varName fName <> "(" <> expListStr args <> ")"
 
 typeToStr :: Type -> Text
 typeToStr (Number n) = T.pack $ show n
