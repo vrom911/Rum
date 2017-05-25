@@ -27,6 +27,7 @@ import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.IntegerPredicate as I
+import qualified LLVM.AST.Linkage as L
 
 -----------------------
 -------- Setup --------
@@ -62,11 +63,12 @@ defineIOStrVariable varName formatString = addDefn $
     , G.initializer = Just $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) formatString
     }
 
-declareExtFun :: AST.Type -> Text -> [(AST.Type, Name)] -> LLVM ()
-declareExtFun retType funName argTypes = addDefn $
+declareExtFun :: AST.Type -> Text -> [(AST.Type, Name)] -> Bool -> LLVM ()
+declareExtFun retType funName argTypes isVararg = addDefn $
   GlobalDefinition $ G.functionDefaults {
     G.name        = Name (T.unpack funName)
-  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], True)
+  , G.linkage     = L.External
+  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], isVararg)
   , G.returnType  = retType
   , G.basicBlocks = []
   }

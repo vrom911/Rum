@@ -45,7 +45,10 @@ library
   default-extensions: OverloadedStrings
                       RecordWildCards
   default-language:    Haskell2010
-  ghc-options:         -Wall, -fno-warn-unused-do-bind
+  ghc-options:         -Wall -fno-warn-unused-do-bind -dynamic
+
+  Include-dirs:        runtime
+  C-sources:           runtime/runtime.c
 
 executable Compiler
   hs-source-dirs:      app
@@ -54,12 +57,10 @@ executable Compiler
   build-depends:       base
                      , Compiler
                      , megaparsec
-                     , mtl
                      , text
-                     , transformers
   default-extensions: OverloadedStrings
   default-language:    Haskell2010
-  ghc-options:         -Wall
+  ghc-options:         -Wall -dynamic
 
 test-suite Compiler-test
   type:                exitcode-stdio-1.0

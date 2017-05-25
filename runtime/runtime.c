@@ -1,12 +1,13 @@
 #include <stdio.h>
 
-void write(int val) {
+int rumWrite(int val) {
     printf("%d\n", val);
+    return 0;
 }
 
-int read() {
+int rumRead() {
     int val;
-    printf("> ");
+//    printf("> ");
     scanf("%d", &val);
     return val;
 }

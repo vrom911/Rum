@@ -1,7 +1,9 @@
 module Compiler.Rum.Compiler.JIT where
 
+import           Control.Monad              (void)
 import           Control.Monad.Except       (runExceptT)
 import           Foreign.Ptr                (FunPtr, castFunPtr )
+--import           Foreign.C.Types            (CInt (..))
 
 import qualified LLVM.AST as AST            (Module, Name(..))
 import           LLVM.Context               (Context, withContext)
@@ -10,6 +12,8 @@ import           LLVM.Module as Mod         (moduleAST, moduleLLVMAssembly, with
 import           LLVM.PassManager           (PassSetSpec(..), defaultCuratedPassSetSpec, runPassManager, withPassManager)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
+
+--foreign import ccall safe "rumRead" rumRead :: CInt
 
 run :: FunPtr a -> IO Double
 run fn = haskFun (castFunPtr fn :: FunPtr (IO Double))
@@ -26,11 +30,11 @@ passes :: PassSetSpec
 passes = defaultCuratedPassSetSpec { optLevel = Just 0 }
 
 runJIT :: AST.Module -> IO (Either String AST.Module)
-runJIT mod =
+runJIT llvmMod =
     withContext $ \context ->
         jit context $ \executionEngine ->
             runExceptT $
-            withModuleFromAST context mod $ \m ->
+            withModuleFromAST context llvmMod $ \m ->
                 withPassManager passes $ \pm -> do
                     () <$ runPassManager pm m
                     optmod <- moduleAST m
@@ -39,7 +43,7 @@ runJIT mod =
                     EE.withModuleInEngine executionEngine m $ \ee -> do
                         mainfn <- EE.getFunction ee (AST.Name "main")
                         case mainfn of
-                            Just fn -> run fn >> return ()
+                            Just fn -> void $ run fn
 --                                putStrLn $ "Evaluated to: " ++ show res
                             Nothing -> return ()
                     return optmod

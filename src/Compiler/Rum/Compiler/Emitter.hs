@@ -4,6 +4,7 @@ module Compiler.Rum.Compiler.Emitter where
 
 import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
 import           Control.Monad.State
+import           Data.Char            (ord)
 import           Data.Map             (Map)
 import qualified Data.Map as Map      (fromList, lookup)
 import qualified Data.Text as T
@@ -32,13 +33,16 @@ codeGenAll pr = let (funs, main) = span isFunDeclSt pr in
 -- Deal with std funs
 codegenProgram :: Rum.Program -> LLVM ()
 codegenProgram program = do
-    defineIOStrVariable ".scanf_str"  "%d\0"
-    defineIOStrVariable ".printf_str" "%d\n\0"
+--    defineIOStrVariable ".scanf_str"  "%d\0"
+--    defineIOStrVariable ".printf_str" "%d\n\0"
 
     codeGenAll program
 
-    declareExtFun Ty.i32 "scanf"   [(Ty.ptr Ty.i8, AST.Name "")]
-    declareExtFun Ty.i32 "printf"  [(Ty.ptr Ty.i8, AST.Name "")]
+    declareExtFun Ty.i32 "rumRead"  [] False
+    declareExtFun Ty.i32 "rumWrite" [(Ty.i32, AST.Name "")] False
+--    declareExtFun Ty.i32 "scanf"   [(Ty.ptr Ty.i8, AST.Name "")] True
+--    declareExtFun Ty.i32 "printf"  [(Ty.ptr Ty.i8, AST.Name "")] True
+--    declareExtFun Ty.i64 "strlen"  [(Ty.ptr Ty.i8, AST.Name "")] False
 
 -- Declaration of many funs
 codeGenTops :: Rum.Program -> LLVM AST.Operand
@@ -193,6 +197,8 @@ compOps = Map.fromList [ (Rum.Eq, iEq), (Rum.NotEq, iNeq)
 
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
 cgenExpr (Rum.Const (Rum.Number c)) = return $ cons (C.Int iBits (fromIntegral c))
+cgenExpr (Rum.Const (Rum.Ch c)) = return $ cons (C.Int 8 (fromIntegral $ ord c))
+cgenExpr (Rum.Const (Rum.Str s)) = pure $ cons $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) (T.unpack s)
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
     getVar nm >>= load
 cgenExpr (Rum.Neg e) = cgenExpr e >>= \x -> iSub iZero x
@@ -216,15 +222,17 @@ codeGenFunCall Rum.FunCall{..} =
     let funNm = T.unpack $ Rum.varName fName in
     mapM cgenExpr args >>= \largs ->
         case funNm of
-            "write" -> let formatString = AST.ConstantOperand $
-                                       C.GetElementPtr True (C.GlobalReference (Ty.ArrayType 4 Ty.i8)
-                                       (AST.Name ".printf_str")) [C.Int 32 0, C.Int 32 0] in
-                       call (externf (AST.Name "printf")) (formatString : largs)
-            "read"  -> let formatString = AST.ConstantOperand $
-                                       C.GetElementPtr True (C.GlobalReference (Ty.ArrayType 3 Ty.i8)
-                                       (AST.Name ".scanf_str")) [C.Int 32 0, C.Int 32 0] in
-                       alloca iType >>= \tempVar ->
-                       call (externf (AST.Name "scanf")) [formatString, tempVar] >> load tempVar
+--            "write" -> let formatString = AST.ConstantOperand $
+--                                       C.GetElementPtr True (C.GlobalReference (Ty.ArrayType 4 Ty.i8)
+--                                       (AST.Name ".printf_str")) [C.Int 32 0, C.Int 32 0] in
+--                       call (externf (AST.Name "printf")) (formatString : largs)
+--            "read"  -> let formatString = AST.ConstantOperand $
+--                                       C.GetElementPtr True (C.GlobalReference (Ty.ArrayType 3 Ty.i8)
+--                                       (AST.Name ".scanf_str")) [C.Int 32 0, C.Int 32 0] in
+--                       alloca iType >>= \tempVar ->
+--                       call (externf (AST.Name "scanf")) [formatString, tempVar] >> load tempVar
+            "write" -> call (externf (AST.Name "rumWrite")) largs
+            "read" -> call (externf (AST.Name "rumRead")) largs
             _ -> call (externf (AST.Name funNm)) largs
 -------------------------------------------------------------------------------
 -- Compilation
