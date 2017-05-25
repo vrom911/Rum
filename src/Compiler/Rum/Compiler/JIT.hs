@@ -23,7 +23,7 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
     fastins  = Nothing -- fast instruction selection
 
 passes :: PassSetSpec
-passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
+passes = defaultCuratedPassSetSpec { optLevel = Just 0 }
 
 runJIT :: AST.Module -> IO (Either String AST.Module)
 runJIT mod =
@@ -35,12 +35,11 @@ runJIT mod =
                     () <$ runPassManager pm m
                     optmod <- moduleAST m
                     s <- moduleLLVMAssembly m
-                    putStrLn s
+                    writeFile "local_example.ll" s
                     EE.withModuleInEngine executionEngine m $ \ee -> do
                         mainfn <- EE.getFunction ee (AST.Name "main")
                         case mainfn of
-                            Just fn -> do
-                                res <- run fn
-                                putStrLn $ "Evaluated to: " ++ show res
+                            Just fn -> run fn >> return ()
+--                                putStrLn $ "Evaluated to: " ++ show res
                             Nothing -> return ()
                     return optmod

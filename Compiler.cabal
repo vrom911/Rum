@@ -28,6 +28,7 @@ library
                        Compiler.Rum.StackMachine.Util
                        Compiler.Rum.Compiler.CodeGen
                        Compiler.Rum.Compiler.Emitter
+                       Compiler.Rum.Compiler.Rummer
                        Compiler.Rum.Compiler.JIT
   build-depends:       base >= 4.7 && < 5
                      , containers

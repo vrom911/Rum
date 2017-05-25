@@ -1,34 +1,24 @@
 module Main where
 
-import           Control.Monad.State                  (evalState, evalStateT, void)
-import           Control.Monad.Trans.Reader           (runReaderT)
 import qualified Data.Text.IO as TIO
 import           System.Environment                   (getArgs)
 import           Text.Megaparsec                      (parse)
 
-import           Compiler.Rum.Interpreter.Rummer      (interpret)
+import           Compiler.Rum.Internal.AST
 import           Compiler.Rum.Internal.Parser         (progP)
-import           Compiler.Rum.Interpreter.Rumlude     (preludeLibrary)
-import           Compiler.Rum.Internal.AST            (Environment(..), Program, Statement)
 import           Compiler.Rum.Internal.ToString       (progToStr)
-import           Compiler.Rum.Internal.Util           (runIOInterpret)
-import           Compiler.Rum.StackMachine.Translator (translateP)
-import           Compiler.Rum.StackMachine.Stacker    (stacker)
-import           Compiler.Rum.StackMachine.Structure  (StackEnvironment(..))
-import           Compiler.Rum.StackMachine.Util       (buildLabelsMap, emptyVars)
-import           Compiler.Rum.Compiler.Emitter
-import           Compiler.Rum.Compiler.CodeGen
-import           Compiler.Rum.Compiler.JIT (runJIT)
+import           Compiler.Rum.Interpreter.Rummer      (rumInterpreter)
+import           Compiler.Rum.StackMachine.Stacker    (rumStacker)
+import           Compiler.Rum.Compiler.Rummer         (rumCompiler)
 
 main :: IO ()
 main = do
     progArgs@(opt:cmdArgs) <- getArgs  -- [opt, file] <- getArgs
     case opt of
         "-it" -> run "prog.expr" test
-        "-st" -> run "prog.expr" stackTest
-        "-i" -> run (head cmdArgs) interpr
-        "-s" -> run (head cmdArgs) stackRun
-        "-c" -> run (head cmdArgs) (compile $ head cmdArgs)
+        "-i" -> run (head cmdArgs) rumInterpreter
+        "-s" -> run (head cmdArgs) rumStacker
+        "-c" -> run (head cmdArgs) (rumCompiler $ head cmdArgs)
         _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
@@ -42,26 +32,5 @@ run fileName f = do
 test :: [Statement] -> IO ()
 test p = do
     print p
-    interpr p
+    rumInterpreter p
     TIO.putStrLn $ progToStr 0 p
-
-interpr :: [Statement] -> IO ()
-interpr p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)
-
-stackRun :: Program -> IO ()
-stackRun p = do
-    let instrs = evalState (translateP p) 0
-    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
-
-stackTest :: Program -> IO ()
-stackTest p = do
-    print p
-    let instrs = evalState (translateP p) 0
-    print instrs
-    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
-
-compile :: String -> Program -> IO ()
-compile modName p = do
-    print p
-    () <$ codeGenMaybeWorks modName p
---    void $ runJIT $ codegenLLVM modName p

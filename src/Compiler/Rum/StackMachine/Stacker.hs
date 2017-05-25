@@ -1,15 +1,19 @@
 module Compiler.Rum.StackMachine.Stacker where
 
-import           Control.Monad.State       (execStateT, get, gets, liftIO, modify, replicateM, unless, when)
-import           Control.Monad.Trans.Reader(ask, asks, runReaderT)
-import qualified Data.HashMap.Strict as HM (lookup)
-import           Data.Maybe                (fromMaybe)
-import           Text.Read                 (readMaybe)
+import           Control.Monad.State        ( evalState, evalStateT, execStateT, get
+                                            , gets, liftIO, modify, replicateM
+                                            , unless, when
+                                            )
+import           Control.Monad.Trans.Reader (ask, asks, runReaderT)
+import qualified Data.HashMap.Strict as HM  (lookup)
+import           Data.Maybe                 (fromMaybe)
+import           Text.Read                  (readMaybe)
 
 import Compiler.Rum.Internal.AST
 import Compiler.Rum.Internal.Util
 import Compiler.Rum.Internal.Rumlude
 import Compiler.Rum.StackMachine.Structure
+import Compiler.Rum.StackMachine.Translator (translateP)
 import Compiler.Rum.StackMachine.Util
 
 stacker :: InterpretStack
@@ -78,3 +82,8 @@ execute = do
     push = modify . pushStack
     pop :: InterpretStack
     pop = modify popStack
+
+rumStacker :: Program -> IO ()
+rumStacker p = do
+    let instrs = evalState (translateP p) 0
+    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)

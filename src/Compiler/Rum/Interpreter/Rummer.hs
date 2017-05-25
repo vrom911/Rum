@@ -7,6 +7,7 @@ import qualified Data.HashMap.Strict as HM (fromList, union)
 
 import           Compiler.Rum.Internal.AST
 import           Compiler.Rum.Internal.Util
+import           Compiler.Rum.Interpreter.Rumlude (preludeLibrary)
 
 interpret :: Program -> InterpretT
 interpret [] = return Unit
@@ -90,3 +91,9 @@ whenT cond s  = if cond then s else pure Unit
 
 modifyT :: MonadState s m => (s -> s) -> m Type
 modifyT f = modify f >> pure Unit
+
+-------------------
+----- Rummer ------
+-------------------
+rumInterpreter :: [Statement] -> IO ()
+rumInterpreter p = runIOInterpret (interpret p) (Env mempty preludeLibrary False)

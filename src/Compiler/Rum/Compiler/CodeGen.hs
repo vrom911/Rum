@@ -2,31 +2,31 @@
 
 module Compiler.Rum.Compiler.CodeGen where
 
-import           Control.Monad.State (MonadState, State, execState, gets, modify)
-import           Data.Map (Map)
-import qualified Data.Map as Map (empty, insert, lookup, toList)
-import           Data.Maybe (fromMaybe)
-import           Data.List (map, sortBy)
-import           Data.Function (on)
-import           Data.Text (Text)
+import           Data.Char           (ord)
+import           Control.Monad.State (MonadState, State, execState, gets, modify, void)
+import           Data.Map            (Map)
+import qualified Data.Map as Map     (empty, insert, lookup, toList)
+import           Data.Maybe          (fromMaybe)
+import           Data.List           (map, sortBy)
+import           Data.Function       (on)
+import           Data.Text           (Text)
 import qualified Data.Text as T
+import           GHC.Word            (Word32)
 
-import           LLVM.AST.Global (Global(..), functionDefaults)
+import qualified LLVM.AST.Global as G  (Global(..), functionDefaults, globalVariableDefaults)
 import qualified LLVM.AST as AST
-import           LLVM.AST.Type (i32, void)
-import           LLVM.AST  ( BasicBlock(..), Definition(..)
-                           , Instruction(..)
-                           , Module(..), Name(..)
-                           , Named(..)
-                           , Operand(..), Parameter(..), Terminator(..)
-                           , defaultModule
-                           )
+import qualified LLVM.AST.Type as Ty   (Type(..), i8, i32)
+import           LLVM.AST              ( BasicBlock(..), Definition(..)
+                                       , Instruction(..)
+                                       , Module(..), Name(..)
+                                       , Named(..)
+                                       , Operand(..), Parameter(..), Terminator(..)
+                                       , defaultModule
+                                       )
 import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.IntegerPredicate as I
-
-import Compiler.Rum.Internal.AST as Rum (Type(..))
 
 -----------------------
 -------- Setup --------
@@ -45,12 +45,30 @@ addDefn def = gets moduleDefinitions >>= \defs ->
     modify (\s -> s { moduleDefinitions = defs ++ [def] })
 
 defineFun ::  AST.Type -> Text -> [(AST.Type, Name)] -> [BasicBlock] -> LLVM ()
-defineFun ret funName argtys body = addDefn $
-  GlobalDefinition $ functionDefaults {
-    name        = Name (T.unpack funName)
-  , parameters  = ([Parameter typ nm [] | (typ, nm) <- argtys], False)
-  , returnType  = ret
-  , basicBlocks = body
+defineFun retType funName argTypes body = addDefn $
+  GlobalDefinition $ G.functionDefaults {
+    G.name        = Name (T.unpack funName)
+  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], False)
+  , G.returnType  = retType
+  , G.basicBlocks = body
+  }
+
+defineIOStrVariable :: String -> String -> LLVM ()
+defineIOStrVariable varName formatString = addDefn $
+    GlobalDefinition $ G.globalVariableDefaults {
+      G.name        = Name varName
+    , G.type'       = Ty.ArrayType (fromIntegral $ length formatString) Ty.i8
+    , G.isConstant  = True
+    , G.initializer = Just $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) formatString
+    }
+
+declareExtFun :: AST.Type -> Text -> [(AST.Type, Name)] -> LLVM ()
+declareExtFun retType funName argTypes = addDefn $
+  GlobalDefinition $ G.functionDefaults {
+    G.name        = Name (T.unpack funName)
+  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], True)
+  , G.returnType  = retType
+  , G.basicBlocks = []
   }
 
 -----------------------------
@@ -62,7 +80,7 @@ type SymbolTable = [(String, Operand)]
 data CodegenState
   = CodegenState { currentBlock :: Name                     -- Name of the active block to append to
                  , blocks       :: Map Name BlockState  -- Blocks for function
-                 , symtab       :: SymbolTable              -- Function scope symbol table
+                 , symTable       :: SymbolTable              -- Function scope symbol table
                  , blockCount   :: Int                      -- Count of basic blocks
                  , count        :: Word                     -- Count of unnamed instructions
                  , names        :: Names                    -- Name Supply
@@ -74,15 +92,20 @@ data BlockState
                  , term  :: Maybe (Named Terminator)       -- Block terminator
                  } deriving Show
 
+newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
+  deriving (Functor, Applicative, Monad, MonadState CodegenState )
 ---------------------------
 ---------- Types ----------
 ---------------------------
-tempType :: AST.Type
-tempType = i32
+iType :: AST.Type
+iType = Ty.i32
 
-getType :: Rum.Type -> AST.Type
-getType (Rum.Number _) = i32
-getType Rum.Unit = void
+iBits :: Word32
+iBits = 32
+
+--getType :: Rum.Type -> AST.Type
+--getType (Rum.Number _) = Ty.i32
+--getType Rum.Unit = Ty.void
 --getType (Rum.Str _)    =
 
 -------------------------
@@ -99,8 +122,6 @@ uniqueName nm ns =
 ------------------------------
 ----- Codegen Operations -----
 ------------------------------
-newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState )
 
 sortBlocks :: [(Name, BlockState)] -> [(Name, BlockState)]
 sortBlocks = sortBy (compare `on` (idx . snd))
@@ -109,9 +130,9 @@ createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
 makeBlock :: (Name, BlockState) -> BasicBlock
-makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (maketerm t)
+makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (makeTerm t)
   where
-    maketerm = fromMaybe (error $ "Block has no terminator: " ++ show l)
+    makeTerm = fromMaybe (error $ "Block has no terminator: " ++ show l)
 
 entryBlockName :: String
 entryBlockName = "entry"
@@ -134,18 +155,35 @@ fresh = do
 
 instr :: Instruction -> Codegen Operand
 instr ins = do
-  n <- fresh
-  let ref = UnName n
+  nm <- fresh
+  let ref = UnName nm
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )
   return $ local ref
 
+--namedInstr :: String -> Instruction -> Codegen Operand
+--namedInstr name instruction = do
+--    identfiersNames <- gets names
+--    let (newName, newNameMap) = uniqueName name identfiersNames
+--    modify $ \codegenState -> codegenState { names = newNameMap }
+--    addInstr (Name newName) instruction
+--
+--addInstr :: Name -> Instruction -> Codegen Operand
+--addInstr name instruction = do
+--    curBlock  <- current
+--    let curStack = stack curBlock
+--    modifyBlock (curBlock { stack = curStack ++ [name := instruction] })
+--    return $ LocalReference iType name
+
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
-  blk <- current
-  modifyBlock (blk { term = Just trm })
-  return trm
+  curBlock <- current
+  case term curBlock of
+      Just oldTrm -> return oldTrm
+      Nothing            -> do
+          modifyBlock (curBlock { term = Just trm })
+          return trm
 
 -------------------------------
 --------- Block Stack ---------
@@ -164,7 +202,7 @@ addBlock bname = do
                    , blockCount = succ ix
                    , names = supply
                    }
-  return (Name qname)
+  return $ Name qname
 
 setBlock :: Name -> Codegen ()
 setBlock bname = modify (\s -> s { currentBlock = bname })
@@ -184,24 +222,24 @@ current = getBlock >>= \c -> gets blocks >>= \blks ->
 ------- Symbol Table -------
 ----------------------------
 assign :: String -> Operand -> Codegen ()
-assign v x = gets symtab >>= \lcls ->
-    modify (\s -> s {symtab = (v, x) : lcls})
+assign v x = gets symTable >>= \symbs ->
+    modify (\s -> s {symTable = (v, x) : symbs})
 
 getVar :: String -> Codegen Operand
-getVar var = gets symtab >>= \syms ->
+getVar var = gets symTable >>= \syms ->
     pure $ fromMaybe (error $ "Local variable not in scope: " ++ show var) (lookup var syms)
 
 ----------------------------
 -------- References --------
 ----------------------------
 local ::  Name -> Operand
-local = LocalReference tempType
+local = LocalReference iType
 
 global ::  Name -> C.Constant
-global = C.GlobalReference tempType
+global = C.GlobalReference iType
 
 externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference tempType
+externf = ConstantOperand . global
 
 ----------------------------------
 ---- Arithmetic and Constants ----
@@ -216,10 +254,10 @@ iMul :: Operand -> Operand -> Codegen Operand
 iMul a b = instr $ Mul False False a b []
 
 iDiv :: Operand -> Operand -> Codegen Operand
-iDiv a b = instr $ UDiv False a b []
+iDiv a b = instr $ SDiv False a b []
 
 iMod :: Operand -> Operand -> Codegen Operand
-iMod a b = instr $ URem a b []
+iMod a b = instr $ SRem a b []
 
 --- logic operations ---
 lAnd :: Operand -> Operand -> Codegen Operand
@@ -231,7 +269,12 @@ lOr a b = instr $ Or a b []
 ---  compare operations ---
 
 iCmp :: I.IntegerPredicate -> Operand -> Operand -> Codegen Operand
-iCmp cond a b = instr $ ICmp cond a b []
+iCmp cond a b = do
+    temp <- instr $ ICmp cond a b []
+    instr $ AST.ZExt temp iType []
+
+bNeq :: Operand -> Operand -> Codegen Operand
+bNeq a b = instr $ AST.ICmp I.NE a b []
 
 iEq :: Operand -> Operand -> Codegen Operand
 iEq = iCmp I.EQ
@@ -256,16 +299,13 @@ cons :: C.Constant -> Operand
 cons = ConstantOperand
 
 iZero :: Operand
-iZero  = cons $ C.Int 32 0
+iZero  = cons $ C.Int iBits 0
 
 isTrue :: Operand -> Codegen Operand
 isTrue = iCmp I.NE iZero
 
 isFalse :: Operand -> Codegen Operand
 isFalse = iCmp I.EQ iZero
-
-uitofp :: AST.Type -> Operand -> Codegen Operand
-uitofp ty a = instr $ UIToFP a ty []
 
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
@@ -281,17 +321,20 @@ store :: Operand -> Operand -> Codegen Operand
 store ptr val = instr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
-load ptr = instr $ Load False ptr Nothing 0 []
+load ptr =instr $ Load False ptr Nothing 0 []
 
-------------------
--- Control Flow --
-------------------
+------------------------
+----- Control Flow -----
+------------------------
 -- Unconditional jump
-br :: Name -> Codegen (Named Terminator)
-br val = terminator $ Do $ Br val []
+br :: Name -> Codegen ()
+br val = void $ terminator $ Do $ Br val []
+
 -- Conditional jump
-cbr :: Operand -> Name -> Name -> Codegen (Named Terminator)
-cbr cond tr fl = terminator $ Do $ CondBr cond tr fl []
+cbr :: Operand -> Name -> Name -> Codegen ()
+cbr cond tr fl = do
+    boolCond <- bNeq cond iZero
+    void $ terminator $ Do $ CondBr boolCond tr fl []
 
 -- return command
 ret :: Operand -> Codegen (Named Terminator)
