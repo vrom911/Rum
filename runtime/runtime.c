@@ -16,24 +16,47 @@ int rumRead() {
 int rumStrlen(char *str) {
     return strlen(str);
 }
+
+char rumStrget(char *str, int n) {
+    return str[n];
+}
+
 //
-//int rumStrget(int *str, int n) {
-//    return str[n];
-//}
-//
-//int * rumStrsub(int *str, int f, int n) {
-//    int s = sizeof(str);
-//    int res[n];
-//    for ( i = 0; i < n && i < s; i++) {
-//        res[i] = str[f + i];
-//    }
-//    return res;
-//}
-//
-//int * rumStrdup(int *str) {
-//    return str;
-//}
-//
-//int * rumStrset(int *str, int i, int el) {
-//
-//}
+char * rumStrsub(char *str, int f, int n) {
+    int s = strlen(str);
+    char* res = malloc(n + 1);
+    int i;
+    for (i = 0; i < n && i < s; i++) {
+        res[i] = str[f + i];
+    }
+    res[i] = '\0';
+    return res;
+}
+
+char * rumStrdup(char *str) {
+    return strdup(str);
+}
+
+char * rumStrset(char *str, int i, char el) {
+    str[i] = el;
+    return str;
+}
+
+char * rumStrcat(char *str1, char *str2) {
+    char *cat = malloc(strlen(str1) + strlen(str2) + 1);
+    cat[0] = '\0';
+    strcat(cat, str1);
+    strcat(cat, str2);
+    return cat;
+}
+
+int rumStrcmp(char *str1, char *str2) {
+    return strcmp(str1, str2);
+}
+
+char *rumStrmake(int n, char c) {
+    char *str = malloc(n + 1);
+    memset(str, c, n);
+    str[n] = '\0';
+    return str;
+}

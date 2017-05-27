@@ -198,12 +198,13 @@ stmtP =   parens stmtP
 
     funCallStmtP :: Parser Statement
     funCallStmtP = do
-        fs@(FunCallStmt f) <- funCallP FunCallStmt
-        let funname = fName f
-        if funname == "strset" then
-            let Var v = head (args f) in
-            return $ AssignmentVar v (FunCallExp f)
-        else return fs
+        fs@(FunCallStmt _) <- funCallP FunCallStmt
+--        let funname = fName f
+--        if funname == "strset" then
+--            let Var v = head (args f) in
+--            return $ AssignmentVar v (FunCallExp f)
+--        else
+        return fs
 
 funP :: Parser Statement
 funP = do

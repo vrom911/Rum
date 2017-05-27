@@ -106,11 +106,6 @@ iType = Ty.i32
 iBits :: Word32
 iBits = 32
 
---getType :: Rum.Type -> AST.Type
---getType (Rum.Number _) = Ty.i32
---getType Rum.Unit = Ty.void
---getType (Rum.Str _)    =
-
 -------------------------
 --------- Names ---------
 -------------------------
@@ -243,11 +238,11 @@ getVar var = gets symTable >>= \syms ->
 local :: Ty.Type -> Name -> Operand
 local = LocalReference
 
-global ::  Name -> C.Constant
-global = C.GlobalReference iType
+global ::  Ty.Type -> Name -> C.Constant
+global = C.GlobalReference
 
-externf :: Name -> Operand
-externf = ConstantOperand . global
+externf :: Ty.Type -> Name -> Operand
+externf ty = ConstantOperand . global ty
 
 ----------------------------------
 ---- Arithmetic and Constants ----
@@ -278,7 +273,9 @@ lOr a b = instr $ Or a b []
 
 iCmp :: I.IntegerPredicate -> Operand -> Operand -> Codegen Operand
 iCmp cond a b = do
-    temp <- instr $ ICmp cond a b []
+    a' <- instr $ AST.ZExt a iType []
+    b' <- instr $ AST.ZExt b iType []
+    temp <- instr $ ICmp cond a' b' []
     instr $ AST.ZExt temp iType []
 
 bNeq :: Operand -> Operand -> Codegen Operand
