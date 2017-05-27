@@ -1,7 +1,5 @@
 module Compiler.Rum.Compiler.Emitter where
 
-
-
 import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
 import           Control.Monad.State
 import           Data.Char            (ord)
@@ -40,6 +38,7 @@ codegenProgram program = do
 
     declareExtFun Ty.i32 "rumRead"  [] False
     declareExtFun Ty.i32 "rumWrite" [(Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32 "rumStrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
 --    declareExtFun Ty.i32 "scanf"   [(Ty.ptr Ty.i8, AST.Name "")] True
 --    declareExtFun Ty.i32 "printf"  [(Ty.ptr Ty.i8, AST.Name "")] True
 --    declareExtFun Ty.i64 "strlen"  [(Ty.ptr Ty.i8, AST.Name "")] False
@@ -58,8 +57,9 @@ codeGenTop Rum.Fun{..} = defineFun iType (Rum.varName funName) fnargs bls
       setBlock entr
       forM_ params $ \a -> do
         let aName = T.unpack $ Rum.varName a
+--        let aType = typeOfOperand a
         var <- alloca iType
-        store var (local (AST.Name aName))
+        store var (local iType (AST.Name aName))
         assign aName var
       codeGenFunProg funBody >>= ret
 codeGenTop _ = error "Impossible happened in CodeGenTop. Only fun Declarations allowed!"
@@ -99,7 +99,7 @@ codeGenStmt Rum.AssignmentVar{..} = do
         oldV <- getVar vName
         () <$ store oldV cgenedVal
     else do
-        v <- alloca iType
+        v <- alloca (typeOfOperand cgenedVal)
         store v cgenedVal
         assign vName v
 codeGenStmt (Rum.FunCallStmt f) =
@@ -198,9 +198,13 @@ compOps = Map.fromList [ (Rum.Eq, iEq), (Rum.NotEq, iNeq)
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
 cgenExpr (Rum.Const (Rum.Number c)) = return $ cons (C.Int iBits (fromIntegral c))
 cgenExpr (Rum.Const (Rum.Ch c)) = return $ cons (C.Int 8 (fromIntegral $ ord c))
-cgenExpr (Rum.Const (Rum.Str s)) = pure $ cons $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) (T.unpack s)
+cgenExpr (Rum.Const (Rum.Str s)) = pure $ cons $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
-    getVar nm >>= load
+    getVar nm >>= \v ->
+        gets varTypes >>= \tps -> case Map.lookup nm tps of
+            Just Ty.ArrayType{..} -> getElementPtr v
+            Just _                -> load v
+            Nothing               -> error "variable type is unknown"
 cgenExpr (Rum.Neg e) = cgenExpr e >>= \x -> iSub iZero x
 cgenExpr Rum.BinOper{..} =
   case Map.lookup bop binOps of
@@ -217,11 +221,14 @@ cgenExpr Rum.CompOper{..} =
 cgenExpr (Rum.FunCallExp f) = codeGenFunCall f
 
 
+rumFunNamesMap :: Map String String
+rumFunNamesMap = Map.fromList [("write", "rumWrite"), ("read", "rumRead"), ("strlen", "rumStrlen")]
+
 codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand
 codeGenFunCall Rum.FunCall{..} =
     let funNm = T.unpack $ Rum.varName fName in
     mapM cgenExpr args >>= \largs ->
-        case funNm of
+        case Map.lookup funNm rumFunNamesMap of
 --            "write" -> let formatString = AST.ConstantOperand $
 --                                       C.GetElementPtr True (C.GlobalReference (Ty.ArrayType 4 Ty.i8)
 --                                       (AST.Name ".printf_str")) [C.Int 32 0, C.Int 32 0] in
@@ -231,9 +238,8 @@ codeGenFunCall Rum.FunCall{..} =
 --                                       (AST.Name ".scanf_str")) [C.Int 32 0, C.Int 32 0] in
 --                       alloca iType >>= \tempVar ->
 --                       call (externf (AST.Name "scanf")) [formatString, tempVar] >> load tempVar
-            "write" -> call (externf (AST.Name "rumWrite")) largs
-            "read" -> call (externf (AST.Name "rumRead")) largs
-            _ -> call (externf (AST.Name funNm)) largs
+            Just n -> call (externf (AST.Name n)) largs
+            Nothing -> call (externf (AST.Name funNm)) largs
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------

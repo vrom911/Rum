@@ -82,10 +82,11 @@ type SymbolTable = [(String, Operand)]
 data CodegenState
   = CodegenState { currentBlock :: Name                     -- Name of the active block to append to
                  , blocks       :: Map Name BlockState  -- Blocks for function
-                 , symTable       :: SymbolTable              -- Function scope symbol table
+                 , symTable     :: SymbolTable              -- Function scope symbol table
                  , blockCount   :: Int                      -- Count of basic blocks
                  , count        :: Word                     -- Count of unnamed instructions
                  , names        :: Names                    -- Name Supply
+                 , varTypes     :: Map String Ty.Type
                  } deriving Show
 -- basic blocks inside of function definitions
 data BlockState
@@ -143,7 +144,7 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
+emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty Map.empty
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
@@ -155,14 +156,17 @@ fresh = do
   modify $ \s -> s { count = iNew }
   return iNew
 
-instr :: Instruction -> Codegen Operand
-instr ins = do
+tyInstr :: Ty.Type -> Instruction -> Codegen Operand
+tyInstr t ins = do
   nm <- fresh
   let ref = UnName nm
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = (ref := ins) : i } )
-  return $ local ref
+  return $ local t ref
+
+instr :: Instruction -> Codegen Operand
+instr = tyInstr iType
 
 --namedInstr :: String -> Instruction -> Codegen Operand
 --namedInstr name instruction = do
@@ -224,8 +228,10 @@ current = getBlock >>= \c -> gets blocks >>= \blks ->
 ------- Symbol Table -------
 ----------------------------
 assign :: String -> Operand -> Codegen ()
-assign v x = gets symTable >>= \symbs ->
-    modify (\s -> s {symTable = (v, x) : symbs})
+assign v x = gets symTable >>= \symbs -> gets varTypes >>= \varTps ->
+    modify (\s -> s { symTable = (v, x) : symbs
+                    , varTypes = Map.insert v (typeOfOperand x) varTps})
+
 
 getVar :: String -> Codegen Operand
 getVar var = gets symTable >>= \syms ->
@@ -234,8 +240,8 @@ getVar var = gets symTable >>= \syms ->
 ----------------------------
 -------- References --------
 ----------------------------
-local ::  Name -> Operand
-local = LocalReference iType
+local :: Ty.Type -> Name -> Operand
+local = LocalReference
 
 global ::  Name -> C.Constant
 global = C.GlobalReference iType
@@ -314,16 +320,19 @@ toArgs = map (\x -> (x, []))
 
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand
-call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+call fn args = tyInstr (typeOfOperand fn) $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
 alloca :: AST.Type -> Codegen Operand
-alloca ty = instr $ Alloca ty Nothing 0 []
+alloca ty = tyInstr ty $ Alloca ty Nothing 0 []
 
 store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr $ Store False ptr val Nothing 0 []
+store ptr val = tyInstr (typeOfOperand val) $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
-load ptr =instr $ Load False ptr Nothing 0 []
+load ptr = tyInstr (typeOfOperand ptr) $ Load False ptr Nothing 0 []
+
+getElementPtr :: Operand -> Codegen Operand
+getElementPtr o = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iZero] []
 
 ------------------------
 ----- Control Flow -----
@@ -341,3 +350,12 @@ cbr cond tr fl = do
 -- return command
 ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
+
+
+typeOfOperand :: Operand -> Ty.Type
+typeOfOperand (AST.LocalReference t _) = t
+typeOfOperand (AST.ConstantOperand C.Int{..}) = iType
+typeOfOperand (AST.ConstantOperand (C.GlobalReference t _ )) = t
+typeOfOperand (AST.ConstantOperand C.Array{..}) = AST.ArrayType (fromIntegral $ length memberValues) memberType
+typeOfOperand _ = iType
+
