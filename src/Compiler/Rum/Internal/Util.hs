@@ -4,9 +4,11 @@ import           Control.Monad             ((>=>))
 import           Control.Monad.State       (evalStateT)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import           Data.Bool                 (bool)
+import           Data.Char                 (isUpper)
 import qualified Data.HashMap.Strict as HM (insert, lookup)
 import           Data.IORef
 import           Data.List                 (foldl')
+import qualified Data.Text as T
 
 import           Compiler.Rum.Internal.AST
 
@@ -125,3 +127,6 @@ isFalse :: Type -> Bool
 isFalse s = Number 0 == s
 isTrue :: Type -> Bool
 isTrue = not . isFalse
+
+isUp :: Variable -> Bool
+isUp var = isUpper $ T.head $varName var

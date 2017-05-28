@@ -2,10 +2,8 @@ module Compiler.Rum.Interpreter.Rummer where
 
 import           Control.Applicative       (liftA2, empty)
 import           Control.Monad.State       (get, gets, lift, liftIO, modify, MonadState)
-import           Data.Char                 (isUpper)
 import qualified Data.HashMap.Strict as HM (fromList, lookup)
 import           Data.IORef
-import qualified Data.Text as T
 
 import           Compiler.Rum.Internal.AST
 import           Compiler.Rum.Internal.Rumlude (runRumlude)
@@ -21,7 +19,7 @@ interpret (st:stmts) = do
 
 interpretSt :: Statement -> InterpretT
 interpretSt AssignmentVar{..}  = eval value >>= \x ->
-    if isUpper $ T.head $varName var
+    if isUp var
     then do
         refs <- gets refVarEnv
         case HM.lookup var refs of
@@ -62,7 +60,7 @@ interpretSt (FunCallStmt f) = evalFunCall f
 eval :: Expression -> InterpretT
 eval (Const c)     = pure c
 eval (Var v)       =
-    if isUpper $ T.head $ varName v
+    if isUp v
     then do
         refVar <- gets (findRefVar v)
         case refVar of
@@ -96,7 +94,12 @@ eval (FunCallExp f) = evalFunCall f
 
 evalFunCall :: FunCall -> InterpretT
 evalFunCall FunCall{fName = Variable "strset", args = [Var vS, i, c]} = do
-    Just valStr <- gets (findRefVar vS)
+    test <- gets (findRefVar vS)
+    valStr <- case test of
+        Just v -> pure v
+        Nothing -> do
+            Just v <- gets (findVar vS)
+            liftIO $ newIORef (Val v)
     Val s <- liftIO $ readIORef valStr
     evI <- eval i
     evC <- eval c
