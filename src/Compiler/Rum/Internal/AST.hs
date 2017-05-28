@@ -11,6 +11,7 @@ import           Control.Monad.State       (MonadIO, MonadState, StateT)
 import           Control.Monad.Trans.Maybe (MaybeT)
 import qualified Data.HashMap.Strict as HM (HashMap)
 import           Data.Hashable             (Hashable)
+import           Data.IORef
 import           Data.String               (IsString, fromString)
 import           Data.Text                 (Text)
 import qualified Data.Text as T            (pack)
@@ -24,7 +25,7 @@ data CompOp  = Eq | NotEq | Lt | Gt | NotGt | NotLt deriving (Show, Eq, Ord)
 
 data LogicOp = And | Or | Xor deriving (Show, Eq, Ord)
 
-newtype Variable = Variable {varName     :: Text} deriving (Show, Eq, Ord, Hashable)
+newtype Variable = Variable {varName :: Text} deriving (Show, Eq, Ord, Hashable)
 
 instance IsString Variable where
     fromString = Variable . T.pack
@@ -72,5 +73,7 @@ newtype Interpret a = Interpret
 type InterpretT = Interpret Type
 
 type VarEnv = HM.HashMap Variable Type
+type RefVarEnv = HM.HashMap Variable (IORef RefType)
+data RefType = Val Type | ArrayRef [IORef RefType]
 type FunEnv = HM.HashMap Variable ([Variable], [Type] -> InterpretT)
-data Environment = Env {varEnv :: VarEnv, funEnv :: FunEnv, isReturn :: Bool}
+data Environment = Env {varEnv :: VarEnv, refVarEnv :: RefVarEnv, funEnv :: FunEnv, isReturn :: Bool}

@@ -1,9 +1,12 @@
 module Compiler.Rum.Internal.Util where
 
-import           Data.Bool                 (bool)
-import qualified Data.HashMap.Strict as HM (insert, lookup)
+import           Control.Monad             ((>=>))
 import           Control.Monad.State       (evalStateT)
 import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import           Data.Bool                 (bool)
+import qualified Data.HashMap.Strict as HM (insert, lookup)
+import           Data.IORef
+import           Data.List                 (foldl')
 
 import           Compiler.Rum.Internal.AST
 
@@ -20,10 +23,27 @@ runIOInterpret action env = () <$ runMaybeT (evalRunInterpret action env)
 updateVars :: Variable -> Type -> Environment ->  Environment
 updateVars v val env@Env{..} = env {varEnv = HM.insert v val varEnv}
 
+updateRefVars :: Variable -> IORef RefType -> Environment -> Environment
+updateRefVars v val env@Env{..} = env {refVarEnv = HM.insert v val refVarEnv}
+
+setRefArrsCell :: [Type] -> Type -> IORef RefType -> IO ()
+setRefArrsCell [Number i] x rt = do
+    Val (Arr ar) <- readIORef rt
+    let (beg, _:rest) = splitAt i ar
+    let result        = beg ++ (x:rest)
+    writeIORef rt (Val $ Arr result)
+setRefArrsCell (Number i:is) x rt = do
+    ArrayRef ar <- readIORef rt
+    setRefArrsCell is x (ar !! i)
+setRefArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
+
 updateArrs :: Variable -> [Type] -> Type -> Environment ->  Environment
 updateArrs v inds val env@Env{..} =
     let Just arr = HM.lookup v varEnv in
     env {varEnv = HM.insert v (Arr (setArrsCell inds val arr)) varEnv}
+
+getArrsCell :: Type -> [Type] -> Type
+getArrsCell = foldl' (\(Arr a) (Number i) -> a !! i)
 
 setArrsCell :: [Type] -> Type -> Type -> [Type]
 setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ (x:rest)
@@ -39,9 +59,15 @@ updateBool b env = env {isReturn = b}
 findVar :: Variable -> Environment -> Maybe Type
 findVar x Env{..} = HM.lookup x varEnv
 
+findRefVar :: Variable -> Environment -> Maybe (IORef RefType)
+findRefVar x Env{..} = HM.lookup x refVarEnv
+
 findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> InterpretT)
 findFun x Env{..} = HM.lookup x funEnv
 
+fromRefTypeToIO :: RefType -> IO Type
+fromRefTypeToIO (Val v) = pure v
+fromRefTypeToIO (ArrayRef a) = Arr <$> mapM (readIORef >=> fromRefTypeToIO) a
 -------------------------
 
 binOp :: BinOp -> (Int -> Int -> Int)
