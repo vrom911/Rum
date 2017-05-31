@@ -5,6 +5,7 @@ import qualified Data.HashMap.Strict as HM
 
 import Compiler.Rum.Internal.AST
 import Compiler.Rum.Internal.Rumlude
+import Compiler.Rum.Internal.Util
 import Compiler.Rum.StackMachine.Structure
 import Compiler.Rum.StackMachine.Util
 
@@ -58,12 +59,17 @@ translateStmt For{..} = do
 translateStmt Return{..} = translateExpr retExp >>= \ret -> pure $ ret ++ [SReturn]
 translateStmt Fun {..} = translate funBody >>= \f ->
     pure $ (Label $ LabelId $ varName funName) : map Store (reverse params) ++ f
+translateStmt (FunCallStmt f@FunCall{fName = "strset", args = [var@(Var v), i, c]}) = do
+    str <- translateExpr var
+    ind <- translateExpr i
+    ch <- translateExpr c
+    pure $ str ++ ind ++ ch ++ [SRumludeCall Strset, Store v]
 translateStmt (FunCallStmt f) = translateFunCall f
 --translateStmt e = error $ "Not supported operation for stack: " ++ show e
 
 translateExpr :: Expression -> Instructions
 translateExpr (Const x)     = pure [Push x]
-translateExpr (Var v)       = pure [Load v]
+translateExpr (Var v)       = if isUp v then pure [LoadRef v] else pure [Load v]
 translateExpr (ArrC ArrCell{..}) = concatMapM translateExpr index >>= \indexes ->
     pure $ indexes ++ [LoadArr arr $ length indexes]
 translateExpr (ArrLit exps) = concatMapM translateExpr exps >>= \ins -> pure $ ins ++ [PushNArr $ length exps]

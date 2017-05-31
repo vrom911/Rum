@@ -7,9 +7,10 @@ import           Control.Monad.State        ( evalState, evalStateT, execStateT,
 import           Control.Monad.Trans.Reader (ask, asks, runReaderT)
 import qualified Data.HashMap.Strict as HM  (lookup)
 import           Data.Maybe                 (fromMaybe)
+import           Data.IORef
 import           Text.Read                  (readMaybe)
 
-import Compiler.Rum.Internal.AST
+import qualified Compiler.Rum.Internal.AST as AST
 import Compiler.Rum.Internal.Util
 import Compiler.Rum.Internal.Rumlude
 import Compiler.Rum.StackMachine.Structure
@@ -41,25 +42,42 @@ execute = do
     executeInstr (Label _)  = return ()
     executeInstr (Push x)   = push x
     executeInstr Pop        = pop
-    executeInstr (PushNArr n) = replicateM n takePopStack >>= \arr -> push (Arr $ reverse arr)
-    executeInstr (LoadArr ar n) = replicateM n takePopStack >>= \indexes ->
-        gets (findSArrCell ar (reverse indexes)) >>= push
+    executeInstr (PushNArr n) = replicateM n takePopStack >>= \arr -> push (AST.Arr $ reverse arr)
+    executeInstr (LoadArr ar n) = do
+        indexes <- replicateM n takePopStack
+        rAr <- gets (findSVar ar)
+        res <- liftIO $ getSArrayCell rAr (reverse indexes)
+        push res
     executeInstr (StoreArr ar n) = replicateM n takePopStack >>= \indexes ->
-        takePopStack >>= \val -> modify (updateSArrs ar (reverse indexes) val)
+        takePopStack >>= \val -> get >>= liftIO . updateSArrs ar (reverse indexes) val
     executeInstr (SBinOp b) =
-        gets takeStack >>= \(Number y) ->
-            pop >> gets takeStack >>= \(Number x) ->
-                pop >> push (Number (binOp b x y))
+        gets takeStack >>= \(AST.Number y) ->
+            pop >> gets takeStack >>= \(AST.Number x) ->
+                pop >> push (AST.Number (binOp b x y))
     executeInstr (SLogicOp l) =
-        gets takeStack >>= \(Number y) ->
-            pop >> gets takeStack >>= \(Number x) ->
-                pop >> push (Number (logicOp l x y))
+        gets takeStack >>= \(AST.Number y) ->
+            pop >> gets takeStack >>= \(AST.Number x) ->
+                pop >> push (AST.Number (logicOp l x y))
     executeInstr (SCompOp c)  =
         gets takeStack >>= \y ->
             pop >> gets takeStack >>= \x ->
                 pop >> push (intCompare c x y)
-    executeInstr (Load v)        = gets (findSVar v) >>= push
-    executeInstr (Store v)       = modify (updateSVars v) >> pop
+    executeInstr (Load v) = gets (findSVar v) >>= \x -> case x of
+        Val y -> push y
+        RefVal y -> liftIO (readIORef y) >>= push
+    executeInstr (LoadRef v) = gets (findSVar v) >>= \x -> case x of
+            RefVal y -> liftIO (readIORef y) >>= push
+            Val y -> push y
+    executeInstr (Store v) =
+        if not (isUp v) then modify (updateSmallVars v) >> pop
+            else do
+                x <- gets $ head.stack
+                vs <- gets vars
+                case HM.lookup v vs of
+                    Just (RefVal m) -> liftIO $ writeIORef m x
+                    Nothing   -> liftIO (newIORef x) >>= \rx -> modify (updateSVars v (RefVal rx))
+                pop
+
     executeInstr (Jump l)        = asks snd >>= \lbls -> modify (updatePos (findLabel l lbls))
     executeInstr (JumpIfFalse l) = gets takeStack >>= \s -> when (isFalse s) $ executeInstr (Jump l)
     executeInstr (JumpIfTrue l)  = gets takeStack >>= \s -> unless (isFalse s) $ executeInstr (Jump l)
@@ -71,19 +89,20 @@ execute = do
     executeInstr (SRumludeCall f) = executeRumlude f
 
 
-    executeRumlude :: RumludeFunName -> InterpretStack
-    executeRumlude Read = liftIO getLine >>= \input ->
-        modify (pushStack $ Number $ fromMaybe (error "Wrong input") (readMaybe input))
-    executeRumlude Write = takePopStack >>= writeRumlude
+    executeRumlude :: AST.RumludeFunName -> InterpretStack
+    executeRumlude AST.Read = liftIO getLine >>= \input ->
+        modify (pushStack $ AST.Number $ fromMaybe (error "Wrong input") (readMaybe input))
+    executeRumlude AST.Write = takePopStack >>= writeRumlude
     executeRumlude f = replicateM (fromMaybe (error "Something gone wrong") (HM.lookup f rumludeFunArgs)) takePopStack >>=
         \args -> push (runRumlude f $ reverse args)
 
-    push :: Type -> InterpretStack
+    push :: AST.Type -> InterpretStack
     push = modify . pushStack
     pop :: InterpretStack
     pop = modify popStack
 
-rumStacker :: Program -> IO ()
+rumStacker :: AST.Program -> IO ()
 rumStacker p = do
     let instrs = evalState (translateP p) 0
+--    putStrLn $ unlines $ map show instrs
     evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)

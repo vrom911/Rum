@@ -7,6 +7,7 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Reader
 import qualified Data.HashMap.Strict as HM
 import           Data.Hashable             (Hashable)
+import           Data.IORef
 import           Data.String               (IsString, fromString)
 import           Data.Text                 (Text)
 import qualified Data.Text as T
@@ -29,6 +30,7 @@ data Instruction = Nop       -- No operation
                  | JumpIfTrue LabelId
                  | JumpIfFalse LabelId
                  | Load Variable
+                 | LoadRef Variable
                  | Store Variable
                  | Label LabelId
                  | SFunCall LabelId Int    -- Call a function
@@ -42,7 +44,9 @@ data Instruction = Nop       -- No operation
 type Instructions = State Int [Instruction]
 type Labels = HM.HashMap LabelId Int
 type Stack = [Type]
-data StackEnvironment = SEnv { vars :: VarEnv
+type RefSVarEnv = HM.HashMap Variable SRefType
+data SRefType = Val Type | RefVal (IORef Type)
+data StackEnvironment = SEnv { vars :: RefSVarEnv
                              , stack :: Stack
                              , pos :: Int
                              }
