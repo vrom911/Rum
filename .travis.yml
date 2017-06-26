@@ -11,10 +11,10 @@ addons:
   apt:
     sources:
       - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.5
+      - llvm-toolchain-precise-4.0
     packages:
-      - llvm-3.5
-      - llvm-3.5-dev
+      - llvm-4.0
+      - llvm-4.0-dev
       - g++-4.8
       - libgmp-dev
 
