@@ -17,6 +17,8 @@ addons:
       - llvm-4.0-dev
       - g++-4.8
       - libgmp-dev
+      - libllvm4.0
+      - libclang-4.0-dev
 
 before_install:
   # Download and unpack the stack executable

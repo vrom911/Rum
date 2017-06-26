@@ -33,8 +33,8 @@
       <file leaf-file-name=".travis.yml" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/.travis.yml">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="205">
-              <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="15" />
+            <state relative-caret-position="340">
+              <caret line="20" column="24" lean-forward="true" selection-start-line="20" selection-start-column="24" selection-end-line="20" selection-end-column="24" />
               <folding />
             </state>
           </provider>
@@ -576,7 +576,7 @@
       <workItem from="1497274514916" duration="143000" />
       <workItem from="1498390328717" duration="1834000" />
       <workItem from="1498396824621" duration="623000" />
-      <workItem from="1498399158312" duration="38759000" />
+      <workItem from="1498399158312" duration="39521000" />
     </task>
     <task id="LOCAL-00001" summary="Add rc.sh and make tests work">
       <created>1494432360345</created>
@@ -760,11 +760,18 @@
       <option name="project" value="LOCAL" />
       <updated>1498515690601</updated>
     </task>
-    <option name="localTasksCounter" value="27" />
+    <task id="LOCAL-00027" summary="Fix Travis CI">
+      <created>1498516455035</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1498516455035</updated>
+    </task>
+    <option name="localTasksCounter" value="28" />
     <servers />
   </component>
   <component name="TimeTrackingManager">
-    <option name="totallyTimeSpent" value="470318000" />
+    <option name="totallyTimeSpent" value="471080000" />
   </component>
   <component name="TodoView">
     <todo-panel id="selected-file">
@@ -1307,8 +1314,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/.travis.yml">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="205">
-          <caret line="17" column="0" lean-forward="false" selection-start-line="17" selection-start-column="0" selection-end-line="17" selection-end-column="15" />
+        <state relative-caret-position="340">
+          <caret line="20" column="24" lean-forward="true" selection-start-line="20" selection-start-column="24" selection-end-line="20" selection-end-column="24" />
           <folding />
         </state>
       </provider>
