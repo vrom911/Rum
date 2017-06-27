@@ -21,3 +21,4 @@ cabal.sandbox.config
 
 prog.expr
 .ideaHaskellLib
+.idea/workspace.xml
