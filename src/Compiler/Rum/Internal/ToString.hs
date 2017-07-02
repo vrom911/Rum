@@ -34,7 +34,7 @@ stmtToStr n For{..}         = tab n <> "for " <> progToStr (succ n) start <>
                               tab n <> "do"   <> progToStr (succ n) body <>
                               tab n <> "od"
 
-stmtToStr n Fun{..}         = tab n <> "fun " <> varName funName <> "(" <> expListStr (Var <$> params) <> ") begin" <>
+stmtToStr n Fun{..}         = tab n <> "fun " <> varName funName <> "(" <> T.intercalate ", " (map paramToStr params) <> ") begin" <>
                               progToStr (succ n) funBody <>
                               tab n <> "end"
 stmtToStr n Return{..}      = tab n <> "return " <> exprToStr retExp
@@ -51,6 +51,7 @@ exprToStr LogicOper{..} = paren l <> lToStr lop <> paren r
 exprToStr CompOper{..}  = paren l <> cToStr cop <> paren r
 exprToStr (FunCallExp f)= funCallToStr f
 
+--paramTypeToStr
 arrCellToStr :: ArrCell -> Text
 arrCellToStr ArrCell{..} =  varName arr <> T.concat (map (\i -> "[" <> exprToStr i <> "]") index)
 
@@ -68,6 +69,16 @@ expListStr :: [Expression] -> Text
 expListStr []         = ""
 expListStr [x]        = exprToStr x
 expListStr (x1:x2:xs) = exprToStr x1 <> ", " <> expListStr (x2:xs)
+
+dataTypeToStr :: DataType -> Text
+dataTypeToStr UnT = "void"
+dataTypeToStr InT = "int"
+dataTypeToStr ChT = "char"
+dataTypeToStr StT = "str"
+dataTypeToStr (ArT t) = "arr[" <> dataTypeToStr t <> "]"
+
+paramToStr :: (Variable, DataType) -> Text
+paramToStr (v, t) = exprToStr (Var v) <> ":" <> dataTypeToStr t
 
 paren :: Expression -> Text
 paren e@(Const _) = exprToStr e

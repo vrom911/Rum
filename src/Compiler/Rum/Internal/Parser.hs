@@ -71,14 +71,28 @@ varOrArrP = do
         Nothing -> return $ Var arName
         Just exs -> return $ ArrC $ ArrCell arName exs
 
+typeP :: Parser DataType
+typeP = many letterChar <* space >>= \ch ->
+    case ch of
+        "void" -> pure UnT
+        "int"  -> pure InT
+        "char" -> pure ChT
+        "str"  -> pure StT
+        "arr"  -> between (txtSpace "[") (txtSpace "]") typeP
+              >>= pure . ArT
+        _      -> fail "Unsupported type used"
+
 arrP :: Parser [Expression]
 arrP = between (txtSpace "[") (txtSpace "]") (exprP `sepBy` chSpace ',')
 
 emptyArrP :: Parser [Expression]
 emptyArrP = [] <$ txtSpace "{}"
 
-paramsP :: Parser [Variable]
-paramsP = varNameP `sepBy` chSpace ','
+funParam :: Parser (Variable, DataType)
+funParam = varNameP <* chSpace ':' >>= \v -> typeP >>= \t -> pure (v, t)
+
+paramsP :: Parser [(Variable, DataType)]
+paramsP = funParam `sepBy` chSpace ','
 
 parens :: Parser a -> Parser a
 parens = between (chSpace '(') (chSpace ')')
@@ -197,21 +211,15 @@ stmtP =   parens stmtP
     returnP = Return <$> (keyword "return" *> exprP)
 
     funCallStmtP :: Parser Statement
-    funCallStmtP = do
-        fs@(FunCallStmt _) <- funCallP FunCallStmt
---        let funname = fName f
---        if funname == "strset" then
---            let Var v = head (args f) in
---            return $ AssignmentVar v (FunCallExp f)
---        else
-        return fs
+    funCallStmtP = funCallP FunCallStmt >>= pure
 
 funP :: Parser Statement
 funP = do
     n    <- keyword "fun" *> varNameP
     prms <- parens paramsP
+    retT <- chSpace ':' *> typeP
     b    <- keyword "begin" *> progMainP <* keyword "end"
-    return $ Fun n prms b
+    return $ Fun n prms b retT
 
 progP :: Parser Program
 progP = liftA2 (++) (space *> many (funP <* space)) progMainP

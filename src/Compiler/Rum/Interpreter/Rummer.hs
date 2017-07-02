@@ -109,7 +109,8 @@ evalFunCall FunCall{..} = do
     let funs = funEnv env
 --    let globals = varEnv env
     evalArgs          <- mapM eval args
-    Just (names, fun) <- gets (findFun fName)
+    Just (namesTypes, fun) <- gets (findFun fName)
+    let (names, _) = unzip namesTypes
     let (locs, refs) = temp names args evalArgs env
     let locals = HM.fromList locs
     let ref = HM.fromList refs

@@ -15,7 +15,7 @@ import           GHC.Word            (Word32)
 
 import qualified LLVM.AST.Global as G  (Global(..), functionDefaults, globalVariableDefaults)
 import qualified LLVM.AST as AST
-import qualified LLVM.AST.Type as Ty   (Type(..), i8, i32)
+import qualified LLVM.AST.Type as Ty   (Type(..), i8, i32, ptr, void)
 import           LLVM.AST              ( BasicBlock(..), Definition(..)
                                        , Instruction(..)
                                        , Module(..), Name(..)
@@ -29,6 +29,7 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.Linkage as L
 
+import qualified Compiler.Rum.Internal.AST as Rum
 -----------------------
 -------- Setup --------
 -----------------------
@@ -81,7 +82,7 @@ type SymbolTable = [(String, Operand)]
 -- toplevel module code generation
 data CodegenState
   = CodegenState { currentBlock :: Name                     -- Name of the active block to append to
-                 , blocks       :: Map Name BlockState  -- Blocks for function
+                 , blocks       :: Map Name BlockState      -- Blocks for function
                  , symTable     :: SymbolTable              -- Function scope symbol table
                  , blockCount   :: Int                      -- Count of basic blocks
                  , count        :: Word                     -- Count of unnamed instructions
@@ -105,6 +106,13 @@ iType = Ty.i32
 
 iBits :: Word32
 iBits = 32
+
+fromDataToType :: Rum.DataType -> AST.Type
+fromDataToType Rum.UnT = Ty.void
+fromDataToType Rum.InT = Ty.i32
+fromDataToType Rum.ChT = Ty.i8
+fromDataToType Rum.StT = Ty.ptr Ty.i8
+fromDataToType (Rum.ArT t) = Ty.ptr $ fromDataToType t
 
 -------------------------
 --------- Names ---------
@@ -232,6 +240,7 @@ getVar :: String -> Codegen Operand
 getVar var = gets symTable >>= \syms ->
     pure $ fromMaybe (error $ "Local variable not in scope: " ++ show var) (lookup var syms)
 
+
 ----------------------------
 -------- References --------
 ----------------------------
@@ -303,8 +312,11 @@ iGt = iCmp I.SGT
 cons :: C.Constant -> Operand
 cons = ConstantOperand
 
+iNum :: Integer -> Operand
+iNum n = cons $ C.Int iBits n
+
 iZero :: Operand
-iZero  = cons $ C.Int iBits 0
+iZero  = iNum 0
 
 isTrue :: Operand -> Codegen Operand
 isTrue = iCmp I.NE iZero
@@ -331,6 +343,9 @@ load ptr = tyInstr (typeOfOperand ptr) $ Load False ptr Nothing 0 []
 getElementPtr :: Operand -> Codegen Operand
 getElementPtr o = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iZero] []
 
+getElementPtrInd :: Operand -> Integer -> Codegen Operand
+getElementPtrInd o n = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iNum n] []
+
 ------------------------
 ----- Control Flow -----
 ------------------------
@@ -355,4 +370,3 @@ typeOfOperand (AST.ConstantOperand C.Int{..}) = iType
 typeOfOperand (AST.ConstantOperand (C.GlobalReference t _ )) = t
 typeOfOperand (AST.ConstantOperand C.Array{..}) = AST.ArrayType (fromIntegral $ length memberValues) memberType
 typeOfOperand _ = iType
-

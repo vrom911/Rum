@@ -19,9 +19,9 @@ import           Compiler.Rum.StackMachine.Structure ( Instruction(..)
                                                      , SRefType(..)
                                                      )
 
------------------
--- Environment --
------------------
+----------------------------
+-------- Environment -------
+----------------------------
 updateSmallVars :: Variable -> StackEnvironment ->  StackEnvironment
 updateSmallVars v sEnv@SEnv{..} =
     sEnv{vars = HM.insert v (Val $ head stack) vars}
@@ -33,18 +33,15 @@ updateSVars v val sEnv@SEnv{..} =
 findSVar :: Variable -> StackEnvironment -> SRefType
 findSVar x SEnv{..} = fromMaybe (error "Couldn't find variable") (HM.lookup x vars)
 
-
---findSArrCell :: Variable -> [SRefType] -> StackEnvironment -> SRefType
---findSArrCell v inds senv = let fullArr = findSVar v senv in
---    getSArrayCell fullArr inds
-
 getSArrayCell :: SRefType -> [Type] -> IO Type
 getSArrayCell (RefVal x) ind = do
     rX <- readIORef x
     pure $ getArrsCell rX ind
+getSArrayCell _  _ = error "getSArrayCell error. Impossible"
+
 
 updateSArrs :: Variable -> [Type] -> Type -> StackEnvironment -> IO ()
-updateSArrs v inds val env@SEnv{..} = do
+updateSArrs v inds val SEnv{..} = do
     let Just (RefVal arr) = HM.lookup v vars
     rArr <- readIORef arr
     writeIORef arr (Arr (setArrsCell inds val rArr))

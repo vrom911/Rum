@@ -17,6 +17,8 @@ import           Data.Text                 (Text)
 import qualified Data.Text as T            (pack)
 import           GHC.Generics              (Generic)
 
+data DataType = InT | ChT | StT | ArT DataType | UnT deriving (Show)
+
 data Type = Number Int | Ch Char | Str Text | Arr [Type] | Unit deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show, Eq, Ord)
@@ -51,7 +53,11 @@ data Statement  = AssignmentVar {var :: Variable, value :: Expression}
                 | RepeatUntil {repCond   :: Expression, act :: Program}
                 | WhileDo     {whileCond :: Expression, act :: Program}
                 | For         {start  :: Program, expr :: Expression, update, body :: Program}
-                | Fun         {funName :: Variable, params :: [Variable], funBody :: Program}
+                | Fun         { funName    :: Variable
+                              , params     :: [(Variable, DataType)]
+                              , funBody    :: Program
+                              , retType    :: DataType
+                              }
                 | Return      {retExp :: Expression}
                 deriving (Show)
 
@@ -75,5 +81,9 @@ type InterpretT = Interpret Type
 type VarEnv = HM.HashMap Variable Type
 type RefVarEnv = HM.HashMap Variable (IORef RefType)
 data RefType = Val Type | ArrayRef [IORef RefType]
-type FunEnv = HM.HashMap Variable ([Variable], [Type] -> InterpretT)
-data Environment = Env {varEnv :: VarEnv, refVarEnv :: RefVarEnv, funEnv :: FunEnv, isReturn :: Bool}
+type FunEnv = HM.HashMap Variable ([(Variable, DataType)], [Type] -> InterpretT)
+data Environment = Env { varEnv    :: VarEnv
+                       , refVarEnv :: RefVarEnv
+                       , funEnv    :: FunEnv
+                       , isReturn  :: Bool
+                       }

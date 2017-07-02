@@ -52,7 +52,7 @@ setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ 
 setArrsCell (Number i:is) x (Arr ar) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr (setArrsCell is x cur):rest)
 setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
-updateFuns :: Variable -> [Variable] -> ([Type] -> InterpretT) -> Environment -> Environment
+updateFuns :: Variable -> [(Variable, DataType)] -> ([Type] -> InterpretT) -> Environment -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
 
 updateBool :: Bool -> Environment -> Environment
@@ -64,7 +64,7 @@ findVar x Env{..} = HM.lookup x varEnv
 findRefVar :: Variable -> Environment -> Maybe (IORef RefType)
 findRefVar x Env{..} = HM.lookup x refVarEnv
 
-findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> InterpretT)
+findFun :: Variable -> Environment -> Maybe ([(Variable, DataType)], [Type] -> InterpretT)
 findFun x Env{..} = HM.lookup x funEnv
 
 fromRefTypeToIO :: RefType -> IO Type

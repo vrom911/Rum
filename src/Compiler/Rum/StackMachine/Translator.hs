@@ -57,8 +57,9 @@ translateStmt For{..} = do
               ++ bodyF ++ up ++ [Jump lblFor, Label lblEnd]
 
 translateStmt Return{..} = translateExpr retExp >>= \ret -> pure $ ret ++ [SReturn]
-translateStmt Fun {..} = translate funBody >>= \f ->
-    pure $ (Label $ LabelId $ varName funName) : map Store (reverse params) ++ f
+translateStmt Fun {..} = let (p, t) = unzip params in
+    translate funBody >>= \f ->
+        pure $ (Label $ LabelId $ varName funName) : map Store (reverse p) ++ f
 translateStmt (FunCallStmt f@FunCall{fName = "strset", args = [var@(Var v), i, c]}) = do
     str <- translateExpr var
     ind <- translateExpr i

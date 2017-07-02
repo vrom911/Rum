@@ -16,9 +16,9 @@ import           LLVM.Module                (moduleLLVMAssembly, withModuleFromA
 import           Compiler.Rum.Compiler.CodeGen
 import qualified Compiler.Rum.Internal.AST as Rum
 
-toSig :: [Rum.Variable] -> [(AST.Type, AST.Name)]
+toSig :: [(Rum.Variable, Rum.DataType)] -> [(AST.Type, AST.Name)]
 toSig = let nm = T.unpack . Rum.varName in
-        map (\x -> (if isUpper $ head (nm x) then Ty.ptr Ty.i8 else iType, AST.Name (nm x)))
+        map (\(x, y) -> (fromDataToType y, AST.Name (nm x)))
 
 -- Fun declarations + main body
 codeGenAll :: Rum.Program -> LLVM ()
@@ -42,11 +42,13 @@ codegenProgram program = do
     declareExtFun Ty.i32 "rumStrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
     declareExtFun Ty.i32 "rumStrget" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name "")] False
     declareExtFun Ty.i32 "rumStrcmp" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.ptr Ty.i8, AST.Name "")] False
+    declareExtFun Ty.i32 "rumArrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
     declareExtFun (Ty.ptr Ty.i8) "rumStrsub" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
     declareExtFun (Ty.ptr Ty.i8) "rumStrdup" [(Ty.ptr Ty.i8, AST.Name "")] False
     declareExtFun (Ty.ptr Ty.i8) "rumStrset" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
     declareExtFun (Ty.ptr Ty.i8) "rumStrcat" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.ptr Ty.i8, AST.Name "")] False
     declareExtFun (Ty.ptr Ty.i8) "rumStrmake" [(Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
+    declareExtFun (Ty.ptr Ty.i32) "rumarrmake" [(Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
 --    declareExtFun Ty.i32 "scanf"   [(Ty.ptr Ty.i8, AST.Name "")] True
 --    declareExtFun Ty.i32 "printf"  [(Ty.ptr Ty.i8, AST.Name "")] True
 --    declareExtFun Ty.i64 "strlen"  [(Ty.ptr Ty.i8, AST.Name "")] False
@@ -57,16 +59,16 @@ codeGenTops = foldr ((>>) . codeGenTop) (return iZero)
 
 -- Deal with one fun declaration in the beginning of the file
 codeGenTop :: Rum.Statement -> LLVM ()
-codeGenTop Rum.Fun{..} = defineFun iType (Rum.varName funName) fnargs bls
+codeGenTop Rum.Fun{..} = defineFun (fromDataToType retType) (Rum.varName funName) fnargs bls
   where
+    p = map fst params
     fnargs = toSig params
     bls = createBlocks $ execCodegen $ do
       entr <- addBlock entryBlockName
       setBlock entr
-      forM_ params $ \a -> do
+      forM_ params $ \(a, b) -> do
         let aName = T.unpack $ Rum.varName a
---        let aType = typeOfOperand a
-        let t = if isUpper $ head aName then Ty.ptr Ty.i8 else iType
+        let t = fromDataToType b
         var <- alloca t
         () <$ store var (local t (AST.Name aName))
         assign aName var
@@ -111,6 +113,11 @@ codeGenStmt Rum.AssignmentVar{..} = do
         v <- alloca (typeOfOperand cgenedVal)
         () <$ store v cgenedVal
         assign vName v
+codeGenStmt (Rum.AssignmentArr cell@Rum.ArrCell{..} val) = do
+    cgenedVal <- cgenExpr val
+    cgenedCell<- cgenExpr $ Rum.ArrC cell
+    () <$ store cgenedCell cgenedVal
+
 codeGenStmt (Rum.FunCallStmt f) =
     void $ codeGenFunCall f
 codeGenStmt Rum.IfElse{..} = do
@@ -209,6 +216,18 @@ cgenExpr (Rum.Const (Rum.Number c)) = return $ cons (C.Int iBits (fromIntegral c
 cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons (C.Int 8 (fromIntegral $ ord c))
 cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
                                     map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
+cgenExpr (Rum.ArrC Rum.ArrCell{..}) = let nm = T.unpack $ Rum.varName arr in
+    mapM cgenExpr index >>= \inds -> getVar nm >>= \v -> getToCell v (map foldEx inds)
+ where
+   getToCell o [] = pure o
+   getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
+
+   foldEx (AST.ConstantOperand (C.Int 32 x)) = x
+--   foldEx (AST.LocalReference t n) =
+
+cgenExpr (Rum.ArrLit exps) = mapM cgenExpr exps >>= \cgenedE -> pure $ cons $ C.Array iType (map foldEx cgenedE)
+  where
+    foldEx (AST.ConstantOperand c) = c
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
     getVar nm >>= \v ->
         gets varTypes >>= \tps -> case Map.lookup nm tps of
@@ -237,6 +256,8 @@ rumFunNamesMap = Map.fromList [ ("write",  ("rumWrite", iType)),  ("read", ("rum
                               , ("strsub", ("rumStrsub", Ty.ptr Ty.i8)), ("strdup", ("rumStrdup", Ty.ptr Ty.i8))
                               , ("strset", ("rumStrset", Ty.ptr Ty.i8)), ("strcat", ("rumStrcat", Ty.ptr Ty.i8))
                               , ("strcmp", ("rumStrcmp", iType)), ("strmake", ("rumStrmake", Ty.ptr Ty.i8))
+                              , ("arrmake", ("rumarrmake", Ty.ptr Ty.i8)), ("Arrmake", ("rumArrmake", Ty.ptr Ty.i8))
+                              , ("arrlen", ("rumArrlen", iType))
                               ]
 
 codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand
