@@ -60,3 +60,13 @@ char *rumStrmake(int n, char c) {
     str[n] = '\0';
     return str;
 }
+
+int rumWriteStr(char *str) {
+    int n = strlen(str);
+    int i;
+    for (i = 0; i < n; i++) {
+        printf("%c", str[i]);
+    }
+    printf("\n");
+    return 0;
+}

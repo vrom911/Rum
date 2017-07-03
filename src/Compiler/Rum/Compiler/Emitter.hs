@@ -39,6 +39,7 @@ codegenProgram program = do
 
     declareExtFun Ty.i32 "rumRead"  [] False
     declareExtFun Ty.i32 "rumWrite" [(Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32 "rumWriteStr" [(Ty.i32, AST.Name "")] False
     declareExtFun Ty.i32 "rumStrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
     declareExtFun Ty.i32 "rumStrget" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name "")] False
     declareExtFun Ty.i32 "rumStrcmp" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.ptr Ty.i8, AST.Name "")] False
@@ -251,13 +252,20 @@ cgenExpr (Rum.FunCallExp f) = codeGenFunCall f
 
 
 rumFunNamesMap :: Map String (String, Ty.Type)
-rumFunNamesMap = Map.fromList [ ("write",  ("rumWrite", iType)),  ("read", ("rumRead", iType))
-                              , ("strlen", ("rumStrlen", iType)), ("strget", ("rumStrget", iType))
-                              , ("strsub", ("rumStrsub", Ty.ptr Ty.i8)), ("strdup", ("rumStrdup", Ty.ptr Ty.i8))
-                              , ("strset", ("rumStrset", Ty.ptr Ty.i8)), ("strcat", ("rumStrcat", Ty.ptr Ty.i8))
-                              , ("strcmp", ("rumStrcmp", iType)), ("strmake", ("rumStrmake", Ty.ptr Ty.i8))
-                              , ("arrmake", ("rumarrmake", Ty.ptr Ty.i8)), ("Arrmake", ("rumArrmake", Ty.ptr Ty.i8))
-                              , ("arrlen", ("rumArrlen", iType))
+rumFunNamesMap = Map.fromList [ ("write",    ("rumWrite",    iType))
+                              , ("read",     ("rumRead",     iType))
+                              , ("strlen",   ("rumStrlen",   iType))
+                              , ("strget",   ("rumStrget",   iType))
+                              , ("strsub",   ("rumStrsub",   Ty.ptr Ty.i8))
+                              , ("strdup",   ("rumStrdup",   Ty.ptr Ty.i8))
+                              , ("strset",   ("rumStrset",   Ty.ptr Ty.i8))
+                              , ("strcat",   ("rumStrcat",   Ty.ptr Ty.i8))
+                              , ("strcmp",   ("rumStrcmp",   iType))
+                              , ("writeStr", ("rumWriteStr", iType))
+                              , ("strmake",  ("rumStrmake",  Ty.ptr Ty.i8))
+                              , ("arrmake",  ("rumarrmake",  Ty.ptr Ty.i8))
+                              , ("Arrmake",  ("rumArrmake",  Ty.ptr Ty.i8))
+                              , ("arrlen",   ("rumArrlen",   iType))
                               ]
 
 codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand

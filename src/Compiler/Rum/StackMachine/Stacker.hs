@@ -93,6 +93,7 @@ execute = do
     executeRumlude AST.Read = liftIO getLine >>= \input ->
         modify (pushStack $ AST.Number $ fromMaybe (error "Wrong input") (readMaybe input))
     executeRumlude AST.Write = takePopStack >>= writeRumlude
+    executeRumlude AST.WriteStr = takePopStack >>= writeRumStr
     executeRumlude f = replicateM (fromMaybe (error "Something gone wrong") (HM.lookup f rumludeFunArgs)) takePopStack >>=
         \args -> push (runRumlude f $ reverse args)
 

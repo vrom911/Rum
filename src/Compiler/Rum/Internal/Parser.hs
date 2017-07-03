@@ -24,6 +24,9 @@ txtSpace s = text s >>= \x -> space >> return x
 chSpace :: Char -> Parser Char
 chSpace s = char s <* space
 
+betweenSpace :: Char -> Char -> Parser a -> Parser a
+betweenSpace open close = between (chSpace open) (chSpace close)
+
 keyword :: String -> Parser ()
 keyword w = text w *> notFollowedBy alphaNumChar *> space
 
@@ -54,7 +57,7 @@ varNameP = fromString <$> (((:) <$> (try (oneOf ['_','$']) <|> letterChar)
 varArrFuncallNameP :: Parser Expression
 varArrFuncallNameP = do
     wtfName <- varNameP
-    maybeArr <- optional $ some $ between (txtSpace "[") (txtSpace "]") exprP
+    maybeArr <- optional $ some $ betweenSpace '[' ']' exprP
     case maybeArr of
         Just arrExp -> return $ ArrC $ ArrCell wtfName arrExp
         Nothing -> do
@@ -66,7 +69,7 @@ varArrFuncallNameP = do
 varOrArrP :: Parser Expression
 varOrArrP = do
     arName <- varNameP
-    ex <- optional $ some $ between (txtSpace "[") (txtSpace "]") exprP
+    ex <- optional $ some $ betweenSpace '[' ']' exprP
     case ex of
         Nothing -> return $ Var arName
         Just exs -> return $ ArrC $ ArrCell arName exs
@@ -78,15 +81,15 @@ typeP = many letterChar <* space >>= \ch ->
         "int"  -> pure InT
         "char" -> pure ChT
         "str"  -> pure StT
-        "arr"  -> between (txtSpace "[") (txtSpace "]") typeP
+        "arr"  -> betweenSpace '[' ']' typeP
               >>= pure . ArT
         _      -> fail "Unsupported type used"
 
 arrP :: Parser [Expression]
-arrP = between (txtSpace "[") (txtSpace "]") (exprP `sepBy` chSpace ',')
+arrP = betweenSpace '[' ']' (exprP `sepBy` chSpace ',')
 
 emptyArrP :: Parser [Expression]
-emptyArrP = [] <$ txtSpace "{}"
+emptyArrP = [] <$ (betweenSpace '{' '}' space)
 
 funParam :: Parser (Variable, DataType)
 funParam = varNameP <* chSpace ':' >>= \v -> typeP >>= \t -> pure (v, t)
@@ -95,7 +98,7 @@ paramsP :: Parser [(Variable, DataType)]
 paramsP = funParam `sepBy` chSpace ','
 
 parens :: Parser a -> Parser a
-parens = between (chSpace '(') (chSpace ')')
+parens = betweenSpace '(' ')'
 
 funCallP :: (FunCall -> f) -> Parser f
 funCallP funCtor = do

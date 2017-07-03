@@ -23,6 +23,7 @@ preludeLibrary = HM.fromList [ ("read",    ([], readFun))
                              , ("strcat",  ([], interpretRumlude Strcat))
                              , ("strcmp",  ([], interpretRumlude Strcmp))
                              , ("strmake", ([], interpretRumlude Strmake))
+                             , ("writeStr", ([], writeStrFun))
                              , ("arrlen",  ([], interpretRumlude Arrlen))
                              , ("arrmake", ([], interpretRumlude Arrmake))
                              , ("Arrmake", ([], interpretRumlude Arrmake))
@@ -34,6 +35,10 @@ preludeLibrary = HM.fromList [ ("read",    ([], readFun))
     writeFun :: [Type] -> InterpretT
     writeFun [x] = Unit <$ writeRumlude x
     writeFun _   = error "Paste Several arggs to write function"
+
+    writeStrFun :: [Type] -> InterpretT
+    writeStrFun [x] = Unit <$ writeRumStr x
+    writeStrFun _   = error "Paste Several arggs to write function"
 
     ----------------------
     -- String Functions --

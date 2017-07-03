@@ -8,15 +8,23 @@ import           Data.Monoid               ((<>))
 import qualified Data.Text as T
 
 import           Compiler.Rum.Internal.AST
+import           Compiler.Rum.Internal.ToString (typeToStr)
 import           Compiler.Rum.StackMachine.Structure
 
 rumludeFunNames :: RumludeFunNamesMap
-rumludeFunNames = HM.fromList [ ("read"  , Read ), ("write" , Write)
-                              , ("strlen", Strlen), ("strget", Strget)
-                              , ("strsub", Strsub), ("strdup", Strdup)
-                              , ("strset", Strset), ("strcat", Strcat)
-                              , ("strcmp", Strcmp), ("strmake", Strmake)
-                              , ("arrlen", Arrlen), ("arrmake", Arrmake)
+rumludeFunNames = HM.fromList [ ("read"  , Read )
+                              , ("write" , Write)
+                              , ("strlen", Strlen)
+                              , ("strget", Strget)
+                              , ("strsub", Strsub)
+                              , ("strdup", Strdup)
+                              , ("strset", Strset)
+                              , ("strcat", Strcat)
+                              , ("strcmp", Strcmp)
+                              , ("strmake", Strmake)
+                              , ("writeStr", WriteStr)
+                              , ("arrlen", Arrlen)
+                              , ("arrmake", Arrmake)
                               , ("Arrmake", Arrmake)
                               ]
 
@@ -66,3 +74,7 @@ writeRumlude x =
 --    liftIO $ putStr "> > " -- for compiler-test/expressions
 --    liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions
     liftIO $ putStrLn $ typeToInt x  -- res ?: error "writeln error"
+
+writeRumStr :: MonadIO m => Type -> m ()
+writeRumStr x =
+    liftIO $ putStrLn $ T.unpack $ typeToStr x

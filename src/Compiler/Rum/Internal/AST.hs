@@ -36,7 +36,7 @@ data ArrCell  = ArrCell {arr :: Variable, index :: [Expression]} deriving (Show)
 data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
                 | Var   Variable
-                | ArrC  ArrCell
+                | ArrC  ArrCell       -- for a[i][j]
                 | ArrLit [Expression] -- for [ a, b, c ]
                 | Neg   Expression
                 | BinOper   {bop :: BinOp,   l, r :: Expression}
@@ -64,7 +64,7 @@ data Statement  = AssignmentVar {var :: Variable, value :: Expression}
 type Program    = [Statement]
 
 data RumludeFunName = Read   | Write
-                    | Strlen | Strget | Strsub | Strdup | Strset | Strcat | Strcmp | Strmake
+                    | Strlen | Strget | Strsub | Strdup | Strset | Strcat | Strcmp | Strmake | WriteStr
                     | Arrlen | Arrmake
                     deriving (Show, Eq, Ord, Generic)
 instance Hashable RumludeFunName
