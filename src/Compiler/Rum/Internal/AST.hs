@@ -19,7 +19,7 @@ import           GHC.Generics              (Generic)
 
 data DataType = InT | ChT | StT | ArT DataType | UnT deriving (Show)
 
-data Type = Number Int | Ch Char | Str Text | Arr [Type] | Unit deriving (Show, Eq, Ord)
+data Type = Number Int | Ch Char | Str Text | Arr ([Type], Int) | Unit deriving (Show, Eq, Ord)
 
 data BinOp   = Add | Sub | Mul | Div | Mod | Pow    deriving (Show, Eq, Ord)
 
@@ -80,7 +80,7 @@ type InterpretT = Interpret Type
 
 type VarEnv = HM.HashMap Variable Type
 type RefVarEnv = HM.HashMap Variable (IORef RefType)
-data RefType = Val Type | ArrayRef [IORef RefType]
+data RefType = Val Type | ArrayRef ([IORef RefType], Int)
 type FunEnv = HM.HashMap Variable ([(Variable, DataType)], [Type] -> InterpretT)
 data Environment = Env { varEnv    :: VarEnv
                        , refVarEnv :: RefVarEnv

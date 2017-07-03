@@ -56,8 +56,8 @@ runRumlude Strmake [Number n, Ch ch] = Str $ T.replicate n (T.singleton ch)
 ----------------------
 -- Array Functions --
 ----------------------
-runRumlude Arrlen  [Arr ar] = Number $ length ar
-runRumlude Arrmake [Number n, x] = Arr $ replicate n x
+runRumlude Arrlen  [Arr (ar, n)] = Number n
+runRumlude Arrmake [Number n, x] = Arr (replicate n x, n)
 
 runRumlude f args = error $ "Incorrect arguments in " <> show f <> "(" <> show args <> ")"
 
@@ -66,7 +66,7 @@ typeToInt :: Type -> String
 typeToInt (Number n) = show n
 typeToInt (Ch c)     = show $ ord c
 typeToInt (Str s)    = T.unpack s
-typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
+typeToInt (Arr (ar, _))   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
 typeToInt Unit       = "()"
 
 writeRumlude :: MonadIO m => Type -> m ()

@@ -30,26 +30,26 @@ updateRefVars v val env@Env{..} = env {refVarEnv = HM.insert v val refVarEnv}
 
 setRefArrsCell :: [Type] -> Type -> IORef RefType -> IO ()
 setRefArrsCell [Number i] x rt = do
-    Val (Arr ar) <- readIORef rt
+    Val (Arr (ar, size)) <- readIORef rt
     let (beg, _:rest) = splitAt i ar
     let result        = beg ++ (x:rest)
-    writeIORef rt (Val $ Arr result)
+    writeIORef rt (Val $ Arr (result, size))
 setRefArrsCell (Number i:is) x rt = do
-    ArrayRef ar <- readIORef rt
+    ArrayRef (ar, _) <- readIORef rt
     setRefArrsCell is x (ar !! i)
 setRefArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
 updateArrs :: Variable -> [Type] -> Type -> Environment ->  Environment
 updateArrs v inds val env@Env{..} =
-    let Just arr = HM.lookup v varEnv in
-    env {varEnv = HM.insert v (Arr (setArrsCell inds val arr)) varEnv}
+    let Just arr@(Arr (a, n)) = HM.lookup v varEnv in
+    env {varEnv = HM.insert v (Arr ((setArrsCell inds val arr), n)) varEnv}
 
 getArrsCell :: Type -> [Type] -> Type
-getArrsCell = foldl' (\(Arr a) (Number i) -> a !! i)
+getArrsCell = foldl' (\(Arr (a, _)) (Number i) -> a !! i)
 
 setArrsCell :: [Type] -> Type -> Type -> [Type]
-setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ (x:rest)
-setArrsCell (Number i:is) x (Arr ar) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr (setArrsCell is x cur):rest)
+setArrsCell [Number i] x (Arr (ar, _)) =  let (beg, _:rest) = splitAt i ar in beg ++ (x:rest)
+setArrsCell (Number i:is) x (Arr (ar, n)) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr ((setArrsCell is x cur), n):rest)
 setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
 updateFuns :: Variable -> [(Variable, DataType)] -> ([Type] -> InterpretT) -> Environment -> Environment
@@ -69,7 +69,7 @@ findFun x Env{..} = HM.lookup x funEnv
 
 fromRefTypeToIO :: RefType -> IO Type
 fromRefTypeToIO (Val v) = pure v
-fromRefTypeToIO (ArrayRef a) = Arr <$> mapM (readIORef >=> fromRefTypeToIO) a
+fromRefTypeToIO (ArrayRef (a, n)) = mapM (readIORef >=> fromRefTypeToIO) a >>= \x -> pure $ Arr (x, n)
 -------------------------
 
 binOp :: BinOp -> (Int -> Int -> Int)

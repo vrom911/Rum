@@ -62,7 +62,7 @@ typeToStr :: Type -> Text
 typeToStr (Number n) = T.pack $ show n
 typeToStr (Ch c)     = T.pack $ show c
 typeToStr (Str s)    = s
-typeToStr (Arr a)    = "[" <> T.intercalate ", " (map typeToStr a) <> "]"
+typeToStr (Arr (a, _))    = "[" <> T.intercalate ", " (map typeToStr a) <> "]"
 typeToStr Unit       = "()"
 
 expListStr :: [Expression] -> Text

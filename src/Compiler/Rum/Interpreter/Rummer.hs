@@ -76,7 +76,7 @@ eval (ArrC ArrCell{..}) = do
         Nothing -> gets (findVar arr) >>= \v -> case v of
             Just v -> return $ getArrsCell v inds
             Nothing -> empty
-eval (ArrLit exps) = Arr <$> mapM eval exps
+eval (ArrLit exps) = mapM eval exps >>= \x -> pure $ Arr (x, length exps)
 eval (Neg e)       = do
     Number x <- eval e
     pure $ Number (negate x)

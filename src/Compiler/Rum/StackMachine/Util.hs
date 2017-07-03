@@ -43,8 +43,8 @@ getSArrayCell _  _ = error "getSArrayCell error. Impossible"
 updateSArrs :: Variable -> [Type] -> Type -> StackEnvironment -> IO ()
 updateSArrs v inds val SEnv{..} = do
     let Just (RefVal arr) = HM.lookup v vars
-    rArr <- readIORef arr
-    writeIORef arr (Arr (setArrsCell inds val rArr))
+    rArr@(Arr (x, n)) <- readIORef arr
+    writeIORef arr (Arr (setArrsCell inds val rArr, n))
 
 updatePos :: Int -> StackEnvironment -> StackEnvironment
 updatePos i sEnv@SEnv{..} = sEnv{pos = i}

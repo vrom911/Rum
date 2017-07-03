@@ -42,7 +42,7 @@ execute = do
     executeInstr (Label _)  = return ()
     executeInstr (Push x)   = push x
     executeInstr Pop        = pop
-    executeInstr (PushNArr n) = replicateM n takePopStack >>= \arr -> push (AST.Arr $ reverse arr)
+    executeInstr (PushNArr n) = replicateM n takePopStack >>= \arr -> push (AST.Arr (reverse arr, n))
     executeInstr (LoadArr ar n) = do
         indexes <- replicateM n takePopStack
         rAr <- gets (findSVar ar)
