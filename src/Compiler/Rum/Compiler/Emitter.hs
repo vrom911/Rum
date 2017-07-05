@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Compiler.Rum.Compiler.Emitter where
 
 import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
@@ -16,6 +18,9 @@ import           LLVM.Module                (moduleLLVMAssembly, withModuleFromA
 import           Compiler.Rum.Compiler.CodeGen
 import qualified Compiler.Rum.Internal.AST as Rum
 
+
+import Debug.Trace
+
 toSig :: [(Rum.Variable, Rum.DataType)] -> [(AST.Type, AST.Name)]
 toSig = let nm = T.unpack . Rum.varName in
         map (\(x, y) -> (fromDataToType y, AST.Name (nm x)))
@@ -32,29 +37,23 @@ codeGenAll pr = let (funs, main) = span isFunDeclSt pr in
 -- Deal with std funs
 codegenProgram :: Rum.Program -> LLVM ()
 codegenProgram program = do
---    defineIOStrVariable ".scanf_str"  "%d\0"
---    defineIOStrVariable ".printf_str" "%d\n\0"
-
     codeGenAll program
 
-    declareExtFun Ty.i32 "rumRead"  [] False
-    declareExtFun Ty.i32 "rumWrite" [(Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32 "rumWriteStr" [(Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32 "rumStrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
-    declareExtFun Ty.i32 "rumStrget" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32 "rumStrcmp" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.ptr Ty.i8, AST.Name "")] False
-    declareExtFun Ty.i32 "rumArrlen" [(Ty.ptr Ty.i8, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i8) "rumStrsub" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i8) "rumStrdup" [(Ty.ptr Ty.i8, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i8) "rumStrset" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i8) "rumStrcat" [(Ty.ptr Ty.i8, AST.Name ""), (Ty.ptr Ty.i8, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i8) "rumStrmake" [(Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
-    declareExtFun (Ty.ptr Ty.i32) "rumarrmake" [(Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
---    declareExtFun Ty.i32 "scanf"   [(Ty.ptr Ty.i8, AST.Name "")] True
---    declareExtFun Ty.i32 "printf"  [(Ty.ptr Ty.i8, AST.Name "")] True
---    declareExtFun Ty.i64 "strlen"  [(Ty.ptr Ty.i8, AST.Name "")] False
+    declareExtFun Ty.i32  "rumRead"  [] False
+    declareExtFun Ty.i32  "rumWrite" [(Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32  "rumWriteStr" [(Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32  "rumStrlen" [(pointer, AST.Name "")] False
+    declareExtFun Ty.i32  "rumStrget" [(pointer, AST.Name ""), (Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32  "rumStrcmp" [(pointer, AST.Name ""), (pointer, AST.Name "")] False
+    declareExtFun Ty.i32  "rumArrlen" [(arrType, AST.Name "")] False
+    declareExtFun pointer "rumStrsub" [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
+    declareExtFun pointer "rumStrdup" [(pointer, AST.Name "")] False
+    declareExtFun pointer "rumStrset" [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
+    declareExtFun pointer "rumStrcat" [(pointer, AST.Name ""), (pointer, AST.Name "")] False
+    declareExtFun pointer "rumStrmake" [(Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
+    declareExtFun pointer "rumarrmake" [(Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
 
--- Declaration of many funs
+-- Declaration of many custom funs
 codeGenTops :: Rum.Program -> LLVM AST.Operand
 codeGenTops = foldr ((>>) . codeGenTop) (return iZero)
 
@@ -98,15 +97,16 @@ codeGenProg []                 = pure ()
 codeGenProg (Rum.Return{..}:_) = cgenExpr retExp >>= ret >> pure ()
 codeGenProg (s:stmts)          = codeGenStmt s >> codeGenProg stmts
 
+-- Statements
 codeGenStmt :: Rum.Statement -> Codegen ()
 codeGenStmt Rum.Skip = return ()
 codeGenStmt Rum.Return{..} = cgenExpr retExp >>= ret >> return ()
 codeGenStmt Rum.AssignmentVar{..} = do
     cgenedVal <- cgenExpr value
-    symTabl <- gets symTable
-    let vars = map fst symTabl
+    symTabl   <- gets symTable
+    let vars  = map fst symTabl
     let vName = T.unpack $ Rum.varName var
-    if vName `elem` vars
+    if vName `elem` vars            -- reassign var
     then do
         oldV <- getVar vName
         () <$ store oldV cgenedVal
@@ -201,53 +201,74 @@ codeGenStmt Rum.For{..} = do
     return ()
 
 binOps :: Map Rum.BinOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-binOps = Map.fromList [ (Rum.Add, iAdd), (Rum.Sub, iSub)
-                      , (Rum.Mul, iMul), (Rum.Div, iDiv)
-                      , (Rum.Mod, iMod)]
+binOps = Map.fromList [ (Rum.Add, iAdd)
+                      , (Rum.Sub, iSub)
+                      , (Rum.Mul, iMul)
+                      , (Rum.Div, iDiv)
+                      , (Rum.Mod, iMod)
+                      ]
+
 logicOps :: Map Rum.LogicOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-logicOps = Map.fromList [(Rum.And, lAnd), (Rum.Or, lOr)]
+logicOps = Map.fromList [ (Rum.And, lAnd)
+                        , (Rum.Or, lOr)
+                        ]
+
 compOps :: Map Rum.CompOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-compOps = Map.fromList [ (Rum.Eq, iEq), (Rum.NotEq, iNeq)
-                       , (Rum.Lt, iLt), (Rum.Gt, iGt)
-                       , (Rum.NotGt, iNotGt), (Rum.NotLt, iNotLt)
+compOps = Map.fromList [ (Rum.Eq, iEq)
+                       , (Rum.NotEq, iNeq)
+                       , (Rum.Lt, iLt)
+                       , (Rum.Gt, iGt)
+                       , (Rum.NotGt, iNotGt)
+                       , (Rum.NotLt, iNotLt)
                        ]
 
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
-cgenExpr (Rum.Const (Rum.Number c)) = return $ cons (C.Int iBits (fromIntegral c))
-cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons (C.Int 8 (fromIntegral $ ord c))
+cgenExpr (Rum.Const (Rum.Number c)) = pure $ cons $ C.Int iBits (fromIntegral c)
+cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons $ C.Int 8 (fromIntegral $ ord c)
 cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
-                                    map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
+                                        map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
 cgenExpr (Rum.ArrC Rum.ArrCell{..}) = let nm = T.unpack $ Rum.varName arr in
-    mapM cgenExpr index >>= \inds -> getVar nm >>= \v -> getToCell v (map foldEx inds)
+    mapM cgenExpr index >>= \inds -> getVar nm
+        >>= \case
+            (AST.ConstantOperand (C.Struct _ _ (v:xs))) -> error "!!"--getToCell (cons v) (map foldEx inds)
+--            v@(AST.LocalReference Ty.StructureType{..} _) -> getElementPtrInd v 0 >>= \op -> getToCell op (map foldEx inds)
+            v -> getToCell v (map foldEx inds)
  where
    getToCell o [] = pure o
+   getToCell v@(AST.LocalReference Ty.StructureType{..} _) (x:xs) =
+      getElementPtrType v (head elementTypes) >>= \op -> getElementPtrIndType op (getChildType op) x >>= \op1 -> getToCell op1 xs
    getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
 
    foldEx (AST.ConstantOperand (C.Int 32 x)) = x
 --   foldEx (AST.LocalReference t n) =
 
-cgenExpr (Rum.ArrLit exps) = mapM cgenExpr exps >>= \cgenedE -> pure $ cons $ C.Array iType (map foldEx cgenedE)
+   getChildType (AST.LocalReference Ty.StructureType{..} _) = head elementTypes
+   getChildType (AST.LocalReference Ty.ArrayType{..} _)     = elementType
+
+cgenExpr (Rum.ArrLit exps) = mapM cgenExpr exps >>= \cgenedE ->
+    pure $ cons $ C.Struct Nothing False [C.Array (typeOfOperand $ head cgenedE) (map foldEx cgenedE), C.Int 32 (fromIntegral $ length exps)]
   where
     foldEx (AST.ConstantOperand c) = c
+--    foldEx (AST.LocalReference t n) =
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
     getVar nm >>= \v ->
         gets varTypes >>= \tps -> case Map.lookup nm tps of
             Just Ty.ArrayType{..} -> getElementPtr v
             Just _                -> load v
             Nothing               -> error "variable type is unknown"
-cgenExpr (Rum.Neg e) = cgenExpr e >>= \x -> iSub iZero x
+cgenExpr (Rum.Neg e) = cgenExpr e >>= iSub iZero
 cgenExpr Rum.BinOper{..} =
-  case Map.lookup bop binOps of
-    Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
-    Nothing -> error "No such binary operator"
+    case Map.lookup bop binOps of
+        Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
+        Nothing -> error "No such binary operator"
 cgenExpr Rum.LogicOper{..} =
-  case Map.lookup lop logicOps of
-    Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
-    Nothing -> error "No such logic operator"
+    case Map.lookup lop logicOps of
+        Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
+        Nothing -> error "No such logic operator"
 cgenExpr Rum.CompOper{..} =
-  case Map.lookup cop compOps of
-    Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
-    Nothing -> error "No such logic operator"
+    case Map.lookup cop compOps of
+        Just f  -> cgenExpr l >>= \x -> cgenExpr r >>= \y -> f x y
+        Nothing -> error "No such logic operator"
 cgenExpr (Rum.FunCallExp f) = codeGenFunCall f
 
 
@@ -272,9 +293,19 @@ codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand
 codeGenFunCall Rum.FunCall{..} =
     let funNm = T.unpack $ Rum.varName fName in
     mapM modifiedCgenExpr args >>= \largs ->
-            case Map.lookup funNm rumFunNamesMap of
-                Just (n, t) -> call (externf t (AST.Name n)) largs
-                Nothing -> call (externf iType (AST.Name funNm)) largs
+--    traceShow largs $
+    if funNm == "arrlen" then
+        case largs of
+            [v@(AST.ConstantOperand (C.Struct _ _ [_, x]))] -> traceShow v $ pure (cons x)
+            [v@(AST.LocalReference Ty.StructureType{..} _)] ->
+                traceShow v (getElementPtrLen v) >>= load
+            [v@(AST.LocalReference Ty.ArrayType{..} _)]     ->
+                pure $ cons $ C.Int 32 (fromIntegral nArrayElements)
+            x -> error ("Wrong arrlen argument" ++ show x)
+    else
+        case Map.lookup funNm rumFunNamesMap of
+            Just (n, t) -> call (externf t (AST.Name n)) largs
+            Nothing -> call (externf iType (AST.Name funNm)) largs
 
 modifiedCgenExpr :: Rum.Expression -> Codegen AST.Operand
 modifiedCgenExpr str@(Rum.Const (Rum.Str _)) = do

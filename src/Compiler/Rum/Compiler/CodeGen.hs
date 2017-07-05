@@ -104,6 +104,12 @@ newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
 iType :: AST.Type
 iType = Ty.i32
 
+pointer :: AST.Type
+pointer = Ty.ptr Ty.i8
+
+arrType :: AST.Type
+arrType = Ty.StructureType False [Ty.ptr Ty.i32, Ty.i32]
+
 iBits :: Word32
 iBits = 32
 
@@ -112,7 +118,7 @@ fromDataToType Rum.UnT = Ty.void
 fromDataToType Rum.InT = Ty.i32
 fromDataToType Rum.ChT = Ty.i8
 fromDataToType Rum.StT = Ty.ptr Ty.i8
-fromDataToType (Rum.ArT t) = Ty.ptr $ fromDataToType t
+fromDataToType (Rum.ArT t) = Ty.StructureType False [Ty.ptr $ fromDataToType t, Ty.i32]
 
 -------------------------
 --------- Names ---------
@@ -343,9 +349,20 @@ load ptr = tyInstr (typeOfOperand ptr) $ Load False ptr Nothing 0 []
 getElementPtr :: Operand -> Codegen Operand
 getElementPtr o = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iZero] []
 
+getElementPtrType :: Operand -> Ty.Type ->Codegen Operand
+getElementPtrType o t = tyInstr t $ GetElementPtr True o [iZero, iZero] []
+
 getElementPtrInd :: Operand -> Integer -> Codegen Operand
 getElementPtrInd o n = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iNum n] []
 
+getElementPtrIndType :: Operand -> Ty.Type -> Integer -> Codegen Operand
+getElementPtrIndType o t n = tyInstr t $ GetElementPtr True o [iZero, iNum n] []
+
+getElementPtrLen :: Operand -> Codegen Operand
+getElementPtrLen o = tyInstr iType $ GetElementPtr True o [iZero, iNum 1] []
+
+--getArrayStruct :: Operand -> [C.Constant] -> Codegen Operand
+--getArrayStruct o mems = tyInstr (typeOfOperand o) $ C.Struct Nothing False mems []
 ------------------------
 ----- Control Flow -----
 ------------------------
@@ -369,4 +386,5 @@ typeOfOperand (AST.LocalReference t _) = t
 typeOfOperand (AST.ConstantOperand C.Int{..}) = iType
 typeOfOperand (AST.ConstantOperand (C.GlobalReference t _ )) = t
 typeOfOperand (AST.ConstantOperand C.Array{..}) = AST.ArrayType (fromIntegral $ length memberValues) memberType
+typeOfOperand (AST.ConstantOperand C.Struct{..}) = AST.StructureType False $ map (typeOfOperand . cons) memberValues
 typeOfOperand _ = iType
