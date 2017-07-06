@@ -5,6 +5,7 @@ module Compiler.Rum.Compiler.Emitter where
 import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
 import           Control.Monad.State
 import           Data.Char            (isUpper, ord)
+import           Data.Maybe           (fromMaybe)
 import           Data.Map             (Map)
 import qualified Data.Map as Map      (fromList, lookup)
 import qualified Data.Text as T
@@ -28,7 +29,7 @@ toSig = let nm = T.unpack . Rum.varName in
 -- Fun declarations + main body
 codeGenAll :: Rum.Program -> LLVM ()
 codeGenAll pr = let (funs, main) = span isFunDeclSt pr in
-    codeGenTops funs >> codeGenMain main
+    codeGenTops funs >>= codeGenMain main
   where
     isFunDeclSt :: Rum.Statement -> Bool
     isFunDeclSt Rum.Fun{} = True
@@ -39,49 +40,54 @@ codegenProgram :: Rum.Program -> LLVM ()
 codegenProgram program = do
     codeGenAll program
 
-    declareExtFun Ty.i32  "rumRead"  [] False
-    declareExtFun Ty.i32  "rumWrite" [(Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32  "rumWriteStr" [(Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32  "rumStrlen" [(pointer, AST.Name "")] False
-    declareExtFun Ty.i32  "rumStrget" [(pointer, AST.Name ""), (Ty.i32, AST.Name "")] False
-    declareExtFun Ty.i32  "rumStrcmp" [(pointer, AST.Name ""), (pointer, AST.Name "")] False
-    declareExtFun Ty.i32  "rumArrlen" [(arrType, AST.Name "")] False
-    declareExtFun pointer "rumStrsub" [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
-    declareExtFun pointer "rumStrdup" [(pointer, AST.Name "")] False
-    declareExtFun pointer "rumStrset" [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
-    declareExtFun pointer "rumStrcat" [(pointer, AST.Name ""), (pointer, AST.Name "")] False
-    declareExtFun pointer "rumStrmake" [(Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
-    declareExtFun pointer "rumarrmake" [(Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32  "rumRead"     [] False
+    declareExtFun Ty.i32  "rumWrite"    [(Ty.i32, AST.Name "")]  False
+    declareExtFun Ty.i32  "rumWriteStr" [(Ty.i32, AST.Name "")]  False
+    declareExtFun Ty.i32  "rumStrlen"   [(pointer, AST.Name "")] False
+    declareExtFun Ty.i32  "rumStrget"   [(pointer, AST.Name ""), (Ty.i32, AST.Name "")] False
+    declareExtFun Ty.i32  "rumStrcmp"   [(pointer, AST.Name ""), (pointer, AST.Name "")] False
+    declareExtFun Ty.i32  "rumArrlen"   [(arrType, AST.Name "")] False
+    declareExtFun pointer "rumStrsub"   [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i32, AST.Name "")] False
+    declareExtFun pointer "rumStrdup"   [(pointer, AST.Name "")] False
+    declareExtFun pointer "rumStrset"   [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
+    declareExtFun pointer "rumStrcat"   [(pointer, AST.Name ""), (pointer, AST.Name "")] False
+    declareExtFun pointer "rumStrmake"  [(Ty.i32, AST.Name ""),  (Ty.i8, AST.Name "")] False
+    declareExtFun pointer "rumarrmake"  [(Ty.i32, AST.Name ""),  (Ty.i32, AST.Name "")] False
 
 -- Declaration of many custom funs
-codeGenTops :: Rum.Program -> LLVM AST.Operand
-codeGenTops = foldr ((>>) . codeGenTop) (return iZero)
+codeGenTops :: Rum.Program -> LLVM [(String, Ty.Type)]
+codeGenTops x = forM x codeGenTop
 
 -- Deal with one fun declaration in the beginning of the file
-codeGenTop :: Rum.Statement -> LLVM ()
-codeGenTop Rum.Fun{..} = defineFun (fromDataToType retType) (Rum.varName funName) fnargs bls
+codeGenTop :: Rum.Statement -> LLVM (String, Ty.Type)
+codeGenTop Rum.Fun{..} = do
+    let fnm   = Rum.varName funName
+    let retTp = fromDataToType retType
+    defineFun retTp fnm fnargs bls
+    pure (T.unpack fnm, retTp)
   where
-    p = map fst params
+    p      = map fst params
     fnargs = toSig params
-    bls = createBlocks $ execCodegen $ do
-      entr <- addBlock entryBlockName
-      setBlock entr
-      forM_ params $ \(a, b) -> do
-        let aName = T.unpack $ Rum.varName a
-        let t = fromDataToType b
-        var <- alloca t
-        () <$ store var (local t (AST.Name aName))
-        assign aName var
-      codeGenFunProg funBody >>= ret
+    bls    = createBlocks $ execCodegen $ do
+        entr <- addBlock entryBlockName
+        setBlock entr
+        forM_ params $ \(a, b) -> do
+            let aName = T.unpack $ Rum.varName a
+            let t     = fromDataToType b
+            var <- alloca t
+            () <$ store var (local t (AST.Name aName))
+            assign aName var
+        codeGenFunProg funBody >>= ret
 codeGenTop _ = error "Impossible happened in CodeGenTop. Only fun Declarations allowed!"
 
 -- Deal with stmts after all fun declarations (main)
-codeGenMain :: Rum.Program -> LLVM ()
-codeGenMain pr = defineFun iType "main" [] bls
+codeGenMain :: Rum.Program -> [(String, Ty.Type)] -> LLVM ()
+codeGenMain pr globalFuns = defineFun iType "main" [] bls
   where
     bls = createBlocks $ execCodegen $ do
         entr <- addBlock "main"
         setBlock entr
+        modify (\s -> s {funRetTypes = Map.fromList globalFuns})
         codeGenProg pr
         ret iZero
 
@@ -305,7 +311,10 @@ codeGenFunCall Rum.FunCall{..} =
     else
         case Map.lookup funNm rumFunNamesMap of
             Just (n, t) -> call (externf t (AST.Name n)) largs
-            Nothing -> call (externf iType (AST.Name funNm)) largs
+            Nothing     -> gets funRetTypes >>= \globalFuns ->
+                call (externf (funType globalFuns) (AST.Name funNm)) largs
+                where
+                    funType globalFuns = (fromMaybe (error "Function is not in scope") (Map.lookup funNm globalFuns))
 
 modifiedCgenExpr :: Rum.Expression -> Codegen AST.Operand
 modifiedCgenExpr str@(Rum.Const (Rum.Str _)) = do

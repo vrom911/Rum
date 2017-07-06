@@ -33,7 +33,7 @@ instance IsString Variable where
     fromString = Variable . T.pack
 
 data ArrCell  = ArrCell {arr :: Variable, index :: [Expression]} deriving (Show)
-data FunCall = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
+data FunCall  = FunCall {fName :: Variable, args :: [Expression]} deriving (Show)
 data Expression = Const Type
                 | Var   Variable
                 | ArrC  ArrCell       -- for a[i][j]

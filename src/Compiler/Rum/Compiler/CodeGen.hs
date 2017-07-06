@@ -30,6 +30,7 @@ import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.Linkage as L
 
 import qualified Compiler.Rum.Internal.AST as Rum
+
 -----------------------
 -------- Setup --------
 -----------------------
@@ -87,7 +88,8 @@ data CodegenState
                  , blockCount   :: Int                      -- Count of basic blocks
                  , count        :: Word                     -- Count of unnamed instructions
                  , names        :: Names                    -- Name Supply
-                 , varTypes     :: Map String Ty.Type
+                 , varTypes     :: Map String Ty.Type       -- Var name and Type pairs
+                 , funRetTypes  :: Map String Ty.Type       -- Fun name and return Type pairs
                  } deriving Show
 -- basic blocks inside of function definitions
 data BlockState
@@ -98,6 +100,7 @@ data BlockState
 
 newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
   deriving (Functor, Applicative, Monad, MonadState CodegenState )
+
 ---------------------------
 ---------- Types ----------
 ---------------------------
@@ -153,26 +156,26 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty Map.empty
+emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty Map.empty Map.empty
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
 
 fresh :: Codegen Word
 fresh = do
-  i <- gets count
-  let iNew = succ i
-  modify $ \s -> s { count = iNew }
-  return iNew
+    i <- gets count
+    let iNew = succ i
+    modify $ \s -> s { count = iNew }
+    return iNew
 
 tyInstr :: Ty.Type -> Instruction -> Codegen Operand
 tyInstr t ins = do
-  nm <- fresh
-  let ref = UnName nm
-  blk <- current
-  let i = stack blk
-  modifyBlock (blk { stack = (ref := ins) : i } )
-  return $ local t ref
+    nm <- fresh
+    let ref = UnName nm
+    blk <- current
+    let i = stack blk
+    modifyBlock (blk { stack = (ref := ins) : i } )
+    return $ local t ref
 
 instr :: Instruction -> Codegen Operand
 instr = tyInstr iType
@@ -227,7 +230,7 @@ getBlock = gets currentBlock
 
 modifyBlock :: BlockState -> Codegen ()
 modifyBlock new = getBlock >>= \active ->
-  modify (\s -> s { blocks = Map.insert active new (blocks s) })
+    modify (\s -> s { blocks = Map.insert active new (blocks s) })
 
 current :: Codegen BlockState
 current = getBlock >>= \c -> gets blocks >>= \blks ->
@@ -241,11 +244,9 @@ assign v x = gets symTable >>= \symbs -> gets varTypes >>= \varTps ->
     modify (\s -> s { symTable = (v, x) : symbs
                     , varTypes = Map.insert v (typeOfOperand x) varTps})
 
-
 getVar :: String -> Codegen Operand
 getVar var = gets symTable >>= \syms ->
     pure $ fromMaybe (error $ "Local variable not in scope: " ++ show var) (lookup var syms)
-
 
 ----------------------------
 -------- References --------
