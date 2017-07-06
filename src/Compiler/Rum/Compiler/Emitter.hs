@@ -19,9 +19,6 @@ import           LLVM.Module                (moduleLLVMAssembly, withModuleFromA
 import           Compiler.Rum.Compiler.CodeGen
 import qualified Compiler.Rum.Internal.AST as Rum
 
-
-import Debug.Trace
-
 toSig :: [(Rum.Variable, Rum.DataType)] -> [(AST.Type, AST.Name)]
 toSig = let nm = T.unpack . Rum.varName in
         map (\(x, y) -> (fromDataToType y, AST.Name (nm x)))
@@ -236,32 +233,35 @@ cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
 cgenExpr (Rum.ArrC Rum.ArrCell{..}) = let nm = T.unpack $ Rum.varName arr in
     mapM cgenExpr index >>= \inds -> getVar nm
         >>= \case
-            (AST.ConstantOperand (C.Struct _ _ (v:xs))) -> error "!!"--getToCell (cons v) (map foldEx inds)
+            (AST.ConstantOperand (C.Struct _ _ (v:xs))) -> error "Not implemented yet" --getToCell (cons v) (map foldEx inds)
 --            v@(AST.LocalReference Ty.StructureType{..} _) -> getElementPtrInd v 0 >>= \op -> getToCell op (map foldEx inds)
             v -> getToCell v (map foldEx inds)
- where
-   getToCell o [] = pure o
-   getToCell v@(AST.LocalReference Ty.StructureType{..} _) (x:xs) =
+  where
+    getToCell o [] = pure o
+    getToCell v@(AST.LocalReference Ty.StructureType{..} _) (x:xs) =
       getElementPtrType v (head elementTypes) >>= \op -> getElementPtrIndType op (getChildType op) x >>= \op1 -> getToCell op1 xs
-   getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
+    getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
 
-   foldEx (AST.ConstantOperand (C.Int 32 x)) = x
---   foldEx (AST.LocalReference t n) =
+    foldEx (AST.ConstantOperand (C.Int 32 x)) = x
+    --   foldEx (AST.LocalReference t n) =
 
-   getChildType (AST.LocalReference Ty.StructureType{..} _) = head elementTypes
-   getChildType (AST.LocalReference Ty.ArrayType{..} _)     = elementType
+    getChildType (AST.LocalReference Ty.StructureType{..} _) = head elementTypes
+    getChildType (AST.LocalReference Ty.ArrayType{..} _)     = elementType
 
 cgenExpr (Rum.ArrLit exps) = mapM cgenExpr exps >>= \cgenedE ->
-    pure $ cons $ C.Struct Nothing False [C.Array (typeOfOperand $ head cgenedE) (map foldEx cgenedE), C.Int 32 (fromIntegral $ length exps)]
+    pure $ cons $ C.Struct Nothing False [ C.Array (typeOfOperand $ head cgenedE) (map foldEx cgenedE)
+                                         , C.Int 32 (fromIntegral $ length exps)
+                                         ]
   where
     foldEx (AST.ConstantOperand c) = c
 --    foldEx (AST.LocalReference t n) =
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
     getVar nm >>= \v ->
         gets varTypes >>= \tps -> case Map.lookup nm tps of
-            Just Ty.ArrayType{..} -> getElementPtr v
-            Just _                -> load v
-            Nothing               -> error "variable type is unknown"
+            Just Ty.ArrayType{..}     -> getElementPtr v
+            Just Ty.StructureType{..} -> getElementPtr v
+            Just _                    -> load v
+            Nothing                   -> error "variable type is unknown"
 cgenExpr (Rum.Neg e) = cgenExpr e >>= iSub iZero
 cgenExpr Rum.BinOper{..} =
     case Map.lookup bop binOps of
@@ -302,9 +302,9 @@ codeGenFunCall Rum.FunCall{..} =
 --    traceShow largs $
     if funNm == "arrlen" then
         case largs of
-            [v@(AST.ConstantOperand (C.Struct _ _ [_, x]))] -> traceShow v $ pure (cons x)
+            [v@(AST.ConstantOperand (C.Struct _ _ [_, x]))] -> pure (cons x)
             [v@(AST.LocalReference Ty.StructureType{..} _)] ->
-                traceShow v (getElementPtrLen v) >>= load
+                getElementPtrLen v >>= load
             [v@(AST.LocalReference Ty.ArrayType{..} _)]     ->
                 pure $ cons $ C.Int 32 (fromIntegral nArrayElements)
             x -> error ("Wrong arrlen argument" ++ show x)
