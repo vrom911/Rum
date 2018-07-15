@@ -1,15 +1,18 @@
 module Compiler.Rum.Compiler.JIT where
 
-import           Control.Monad              (void)
-import           Control.Monad.Except       (runExceptT)
-import           Foreign.Ptr                (FunPtr, castFunPtr )
+import           Control.Monad        (void)
+import           Control.Monad.Except (runExceptT)
+import           Foreign.Ptr          (FunPtr, castFunPtr)
 --import           Foreign.C.Types            (CInt (..))
 
-import qualified LLVM.AST as AST            (Module, Name(..))
-import           LLVM.Context               (Context, withContext)
-import qualified LLVM.ExecutionEngine as EE (MCJIT, getFunction, withModuleInEngine, withMCJIT)
-import           LLVM.Module as Mod         (moduleAST, moduleLLVMAssembly, withModuleFromAST)
-import           LLVM.PassManager           (PassSetSpec(..), defaultCuratedPassSetSpec, runPassManager, withPassManager)
+import qualified LLVM.AST             as AST (Module, Name (..))
+import           LLVM.Context         (Context, withContext)
+import qualified LLVM.ExecutionEngine as EE (MCJIT, getFunction, withMCJIT,
+                                             withModuleInEngine)
+import           LLVM.Module          as Mod (moduleAST, moduleLLVMAssembly,
+                                              withModuleFromAST)
+import           LLVM.PassManager     (PassSetSpec (..), defaultCuratedPassSetSpec,
+                                       runPassManager, withPassManager)
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
 
@@ -33,13 +36,14 @@ runJIT :: AST.Module -> IO (Either String AST.Module)
 runJIT llvmMod =
     withContext $ \context ->
         jit context $ \executionEngine ->
+--            traceShow () $
             runExceptT $
             withModuleFromAST context llvmMod $ \m ->
                 withPassManager passes $ \pm -> do
                     () <$ runPassManager pm m
                     optmod <- moduleAST m
                     s <- moduleLLVMAssembly m
-                    writeFile "local_example.ll" s
+--                    writeFile "LLVM-example/local_example.ll" s
                     EE.withModuleInEngine executionEngine m $ \ee -> do
                         mainfn <- EE.getFunction ee (AST.Name "main")
                         case mainfn of

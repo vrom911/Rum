@@ -15,10 +15,10 @@ cabal.sandbox.config
 *.hp
 .stack-work/
 
+.ideaHaskellLib
 .idea/
+Compiler.iml
 *.un~
 .DS_Store
 
 prog.expr
-.ideaHaskellLib
-.idea/workspace.xml

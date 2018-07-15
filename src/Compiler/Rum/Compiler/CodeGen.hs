@@ -2,34 +2,33 @@
 
 module Compiler.Rum.Compiler.CodeGen where
 
-import           Data.Char           (ord)
-import           Control.Monad.State (MonadState, State, execState, gets, modify, void)
-import           Data.Map            (Map)
-import qualified Data.Map as Map     (empty, insert, lookup, toList)
-import           Data.Maybe          (fromMaybe)
-import           Data.List           (map, sortBy)
-import           Data.Function       (on)
-import           Data.Text           (Text)
-import qualified Data.Text as T
-import           GHC.Word            (Word32)
+import           Control.Monad.State        (MonadState, State, execState, gets, modify,
+                                             void)
+import           Data.Char                  (ord)
+import           Data.Function              (on)
+import           Data.List                  (map, sortBy)
+import           Data.Map                   (Map)
+import qualified Data.Map                   as Map (empty, insert, lookup, toList)
+import           Data.Maybe                 (fromMaybe)
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import           GHC.Word                   (Word32)
 
-import qualified LLVM.AST.Global as G  (Global(..), functionDefaults, globalVariableDefaults)
-import qualified LLVM.AST as AST
-import qualified LLVM.AST.Type as Ty   (Type(..), i8, i32, ptr, void)
-import           LLVM.AST              ( BasicBlock(..), Definition(..)
-                                       , Instruction(..)
-                                       , Module(..), Name(..)
-                                       , Named(..)
-                                       , Operand(..), Parameter(..), Terminator(..)
-                                       , defaultModule
-                                       )
-import qualified LLVM.AST.Attribute as A
+import           LLVM.AST                   (BasicBlock (..), Definition (..),
+                                             Instruction (..), Module (..), Name (..),
+                                             Named (..), Operand (..), Parameter (..),
+                                             Terminator (..), defaultModule)
+import qualified LLVM.AST                   as AST
+import qualified LLVM.AST.Attribute         as A
 import qualified LLVM.AST.CallingConvention as CC
-import qualified LLVM.AST.Constant as C
-import qualified LLVM.AST.IntegerPredicate as I
-import qualified LLVM.AST.Linkage as L
+import qualified LLVM.AST.Constant          as C
+import qualified LLVM.AST.Global            as G (Global (..), functionDefaults,
+                                                  globalVariableDefaults)
+import qualified LLVM.AST.IntegerPredicate  as I
+import qualified LLVM.AST.Linkage           as L
+import qualified LLVM.AST.Type              as Ty (Type (..), i32, i8, ptr, void)
 
-import qualified Compiler.Rum.Internal.AST as Rum
+import qualified Compiler.Rum.Internal.AST  as Rum
 
 -----------------------
 -------- Setup --------
@@ -117,10 +116,10 @@ iBits :: Word32
 iBits = 32
 
 fromDataToType :: Rum.DataType -> AST.Type
-fromDataToType Rum.UnT = Ty.void
-fromDataToType Rum.InT = Ty.i32
-fromDataToType Rum.ChT = Ty.i8
-fromDataToType Rum.StT = Ty.ptr Ty.i8
+fromDataToType Rum.UnT     = Ty.void
+fromDataToType Rum.InT     = Ty.i32
+fromDataToType Rum.ChT     = Ty.i8
+fromDataToType Rum.StT     = Ty.ptr Ty.i8
 fromDataToType (Rum.ArT t) = Ty.StructureType False [Ty.ptr $ fromDataToType t, Ty.i32]
 
 -------------------------
@@ -316,6 +315,9 @@ iGt :: Operand -> Operand -> Codegen Operand
 iGt = iCmp I.SGT
 
 --------------------------------------
+consZero :: C.Constant
+consZero = C.Int iBits 0
+
 cons :: C.Constant -> Operand
 cons = ConstantOperand
 
@@ -341,11 +343,17 @@ call fn args = tyInstr (typeOfOperand fn) $ Call Nothing CC.C [] (Right fn) (toA
 alloca :: AST.Type -> Codegen Operand
 alloca ty = tyInstr ty $ Alloca ty Nothing 0 []
 
-store :: Operand -> Operand -> Codegen Operand
-store ptr val = tyInstr (typeOfOperand val) $ Store False ptr val Nothing 0 []
+store :: Operand -> Operand -> Codegen ()
+store ptr val = void $ tyInstr (typeOfOperand val) $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = tyInstr (typeOfOperand ptr) $ Load False ptr Nothing 0 []
+
+bitcast :: Operand -> Ty.Type -> Codegen Operand
+bitcast o t = tyInstr t $ BitCast o t []
+
+getElementPtrArr :: Operand -> Integer -> Codegen Operand
+getElementPtrArr o n = tyInstr (typeOfOperand o) $ GetElementPtr True o [iNum n] []
 
 getElementPtr :: Operand -> Codegen Operand
 getElementPtr o = tyInstr (typeOfOperand o) $ GetElementPtr True o [iZero, iZero] []
@@ -362,8 +370,9 @@ getElementPtrIndType o t n = tyInstr t $ GetElementPtr True o [iZero, iNum n] []
 getElementPtrLen :: Operand -> Codegen Operand
 getElementPtrLen o = tyInstr iType $ GetElementPtr True o [iZero, iNum 1] []
 
---getArrayStruct :: Operand -> [C.Constant] -> Codegen Operand
---getArrayStruct o mems = tyInstr (typeOfOperand o) $ C.Struct Nothing False mems []
+storeArrIdx :: Operand -> Integer -> Operand -> Codegen ()
+storeArrIdx arr i x = load arr >>= \arrO -> getElementPtrArr arrO i >>= \idx -> store idx x
+
 ------------------------
 ----- Control Flow -----
 ------------------------

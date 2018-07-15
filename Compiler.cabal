@@ -38,6 +38,7 @@ library
                      , llvm-hs-pure
                      , megaparsec
                      , mtl
+                     , pretty-show
                      , safe
                      , text
                      , transformers

@@ -2,22 +2,27 @@
 
 module Compiler.Rum.Compiler.Emitter where
 
-import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
+import           Control.Monad.Except          (ExceptT, forM_, runExceptT, (>=>))
 import           Control.Monad.State
-import           Data.Char            (isUpper, ord)
-import           Data.Maybe           (fromMaybe)
-import           Data.Map             (Map)
-import qualified Data.Map as Map      (fromList, lookup)
-import qualified Data.Text as T
+import           Data.Char                     (ord)
+import           Data.Map                      (Map)
+import qualified Data.Map                      as Map (fromList, lookup)
+import           Data.Maybe                    (fromMaybe)
+import qualified Data.Text                     as T
 
-import qualified LLVM.AST as AST            (Operand(..), Type(..), Module(..), Name(..), Operand(..))
-import qualified LLVM.AST.Constant as C     (Constant(..))
-import qualified LLVM.AST.Type     as Ty
-import           LLVM.Context               (withContext)
-import           LLVM.Module                (moduleLLVMAssembly, withModuleFromAST)
+import Text.Show.Pretty
+import qualified LLVM.AST                      as AST (Module (..), Name (..),
+                                                       Operand (..), Operand (..),
+                                                       Type (..))
+import qualified LLVM.AST.Constant             as C (Constant (..))
+import qualified LLVM.AST.Type                 as Ty
+import           LLVM.Context                  (withContext)
+import           LLVM.Module                   (moduleLLVMAssembly, withModuleFromAST)
 
 import           Compiler.Rum.Compiler.CodeGen
-import qualified Compiler.Rum.Internal.AST as Rum
+import qualified Compiler.Rum.Internal.AST     as Rum
+
+import           Debug.Trace
 
 toSig :: [(Rum.Variable, Rum.DataType)] -> [(AST.Type, AST.Name)]
 toSig = let nm = T.unpack . Rum.varName in
@@ -30,13 +35,14 @@ codeGenAll pr = let (funs, main) = span isFunDeclSt pr in
   where
     isFunDeclSt :: Rum.Statement -> Bool
     isFunDeclSt Rum.Fun{} = True
-    isFunDeclSt _     = False
+    isFunDeclSt _         = False
 
 -- Deal with std funs
 codegenProgram :: Rum.Program -> LLVM ()
 codegenProgram program = do
     codeGenAll program
 
+    declareExtFun pointer "malloc"      [(Ty.i32, AST.Name "")]  False
     declareExtFun Ty.i32  "rumRead"     [] False
     declareExtFun Ty.i32  "rumWrite"    [(Ty.i32, AST.Name "")]  False
     declareExtFun Ty.i32  "rumWriteStr" [(Ty.i32, AST.Name "")]  False
@@ -49,7 +55,6 @@ codegenProgram program = do
     declareExtFun pointer "rumStrset"   [(pointer, AST.Name ""), (Ty.i32, AST.Name ""), (Ty.i8, AST.Name "")] False
     declareExtFun pointer "rumStrcat"   [(pointer, AST.Name ""), (pointer, AST.Name "")] False
     declareExtFun pointer "rumStrmake"  [(Ty.i32, AST.Name ""),  (Ty.i8, AST.Name "")] False
-    declareExtFun pointer "rumarrmake"  [(Ty.i32, AST.Name ""),  (Ty.i32, AST.Name "")] False
 
 -- Declaration of many custom funs
 codeGenTops :: Rum.Program -> LLVM [(String, Ty.Type)]
@@ -112,14 +117,17 @@ codeGenStmt Rum.AssignmentVar{..} = do
     if vName `elem` vars            -- reassign var
     then do
         oldV <- getVar vName
-        () <$ store oldV cgenedVal
+        store oldV cgenedVal
     else do
         v <- alloca (typeOfOperand cgenedVal)
-        () <$ store v cgenedVal
+--        traceM $ "val: " ++ vName ++ "   " ++ show (typeOfOperand cgenedVal)
+--        traceM $ "v: " ++ vName ++ "   " ++ show v
+--        traceM $ "type v: " ++ vName ++ "   " ++ show (typeOfOperand v)
+        store v cgenedVal
         assign vName v
 codeGenStmt (Rum.AssignmentArr cell@Rum.ArrCell{..} val) = do
     cgenedVal <- cgenExpr val
-    cgenedCell<- cgenExpr $ Rum.ArrC cell
+    cgenedCell<- cgenCell cell
     () <$ store cgenedCell cgenedVal
 
 codeGenStmt (Rum.FunCallStmt f) =
@@ -225,41 +233,34 @@ compOps = Map.fromList [ (Rum.Eq, iEq)
                        , (Rum.NotLt, iNotLt)
                        ]
 
+{-# ANN cgenExpr ("HLint: ignore Use uncurry" :: String) #-}
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
 cgenExpr (Rum.Const (Rum.Number c)) = pure $ cons $ C.Int iBits (fromIntegral c)
 cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons $ C.Int 8 (fromIntegral $ ord c)
 cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
                                         map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
-cgenExpr (Rum.ArrC Rum.ArrCell{..}) = let nm = T.unpack $ Rum.varName arr in
-    mapM cgenExpr index >>= \inds -> getVar nm
-        >>= \case
-            (AST.ConstantOperand (C.Struct _ _ (v:xs))) -> error "Not implemented yet" --getToCell (cons v) (map foldEx inds)
---            v@(AST.LocalReference Ty.StructureType{..} _) -> getElementPtrInd v 0 >>= \op -> getToCell op (map foldEx inds)
-            v -> getToCell v (map foldEx inds)
-  where
-    getToCell o [] = pure o
-    getToCell v@(AST.LocalReference Ty.StructureType{..} _) (x:xs) =
-      getElementPtrType v (head elementTypes) >>= \op -> getElementPtrIndType op (getChildType op) x >>= \op1 -> getToCell op1 xs
-    getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
-
-    foldEx (AST.ConstantOperand (C.Int 32 x)) = x
-    --   foldEx (AST.LocalReference t n) =
-
-    getChildType (AST.LocalReference Ty.StructureType{..} _) = head elementTypes
-    getChildType (AST.LocalReference Ty.ArrayType{..} _)     = elementType
-
-cgenExpr (Rum.ArrLit exps) = mapM cgenExpr exps >>= \cgenedE ->
-    pure $ cons $ C.Struct Nothing False [ C.Array (typeOfOperand $ head cgenedE) (map foldEx cgenedE)
-                                         , C.Int 32 (fromIntegral $ length exps)
-                                         ]
-  where
-    foldEx (AST.ConstantOperand c) = c
---    foldEx (AST.LocalReference t n) =
+cgenExpr (Rum.ArrC cell) = cgenCell cell
+cgenExpr (Rum.ArrLit exps) = do
+  let len = length exps
+  cgenedE <- mapM cgenExpr exps
+  let elemType = Ty.ptr $ typeOfOperand $ head cgenedE
+  tempArr <- alloca elemType
+  memoryArr <- codeGenFunCall $ Rum.FunCall "malloc" [Rum.Const $ Rum.Number len]
+  memoryBit <- bitcast memoryArr elemType
+  store tempArr memoryBit
+  forM_ (zip [0..] cgenedE) $ \(i, e) ->
+    storeArrIdx tempArr i e
+  structure <- alloca $ Ty.StructureType False [elemType, Ty.i32]
+  arrLen <- getElementPtrLen structure
+  store arrLen $ cons $ C.Int iBits (fromIntegral len)
+  arrData <- getElementPtrType structure elemType
+  store arrData memoryBit
+--  pure $ cons $ C.Struct Nothing False [C.Array Ty.i32 [], C.Int iBits (fromIntegral len)]
+  load structure
 cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
     getVar nm >>= \v ->
         gets varTypes >>= \tps -> case Map.lookup nm tps of
-            Just Ty.ArrayType{..}     -> getElementPtr v
-            Just Ty.StructureType{..} -> getElementPtr v
+            Just Ty.StructureType{}   -> pure v
             Just _                    -> load v
             Nothing                   -> error "variable type is unknown"
 cgenExpr (Rum.Neg e) = cgenExpr e >>= iSub iZero
@@ -293,6 +294,7 @@ rumFunNamesMap = Map.fromList [ ("write",    ("rumWrite",    iType))
                               , ("arrmake",  ("rumarrmake",  Ty.ptr Ty.i8))
                               , ("Arrmake",  ("rumArrmake",  Ty.ptr Ty.i8))
                               , ("arrlen",   ("rumArrlen",   iType))
+                              , ("malloc",   ("malloc",      Ty.ptr Ty.i8))
                               ]
 
 codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand
@@ -300,27 +302,57 @@ codeGenFunCall Rum.FunCall{..} =
     let funNm = T.unpack $ Rum.varName fName in
     mapM modifiedCgenExpr args >>= \largs ->
 --    traceShow largs $
-    if funNm == "arrlen" then
+    case funNm of
+    "arrlen" ->
         case largs of
             [v@(AST.ConstantOperand (C.Struct _ _ [_, x]))] -> pure (cons x)
             [v@(AST.LocalReference Ty.StructureType{..} _)] ->
+--                traceShow v $
                 getElementPtrLen v >>= load
-            [v@(AST.LocalReference Ty.ArrayType{..} _)]     ->
-                pure $ cons $ C.Int 32 (fromIntegral nArrayElements)
             x -> error ("Wrong arrlen argument" ++ show x)
-    else
+    "arrmake" ->
+            case largs of
+                [AST.ConstantOperand (C.Int _ n), x@(AST.ConstantOperand cx)] ->
+--                    alloca iType >>= \m -> store m (AST.ConstantOperand $ C.Array iType $ replicate (fromIntegral n) cx) >>= \res ->
+                    pure $ cons $ C.Struct Nothing False
+                    [C.GetElementPtr True (C.Array iType $ replicate (fromIntegral n) cx) [], cx]
+
+    _ ->
         case Map.lookup funNm rumFunNamesMap of
             Just (n, t) -> call (externf t (AST.Name n)) largs
             Nothing     -> gets funRetTypes >>= \globalFuns ->
                 call (externf (funType globalFuns) (AST.Name funNm)) largs
                 where
-                    funType globalFuns = (fromMaybe (error "Function is not in scope") (Map.lookup funNm globalFuns))
+                    funType globalFuns = fromMaybe (error "Function is not in scope") (Map.lookup funNm globalFuns)
 
 modifiedCgenExpr :: Rum.Expression -> Codegen AST.Operand
 modifiedCgenExpr str@(Rum.Const (Rum.Str _)) = do
     codeGenStmt (Rum.AssignmentVar "T@" str)
     getVar "T@" >>= getElementPtr
 modifiedCgenExpr x = cgenExpr x
+
+cgenCell Rum.ArrCell{..} = let nm = T.unpack $ Rum.varName arr in
+    mapM cgenExpr index >>= \inds -> getVar nm
+        >>= \v -> getToCell v (map foldEx inds)
+  where
+    getToCell :: AST.Operand -> [Integer] ->Codegen AST.Operand
+    getToCell o [] = load o
+    getToCell v@(AST.LocalReference Ty.StructureType{..} _) (x:xs) =
+--      getElementPtrType v (head elementTypes) >>= \op ->
+--      getElementPtrIndType op (getChildType op) x >>= \op1 ->
+      getElementPtr v >>= load >>= \v' ->
+        getElementPtrArr v' x >>= \op1 ->
+          getToCell op1 xs
+--    getToCell o (x:xs) = getElementPtrInd o x >>= \op -> getToCell op xs
+
+    foldEx :: AST.Operand -> Integer
+    foldEx (AST.ConstantOperand (C.Int 32 x)) = x
+    foldEx (AST.LocalReference t n) = undefined
+    foldEx x = 0
+
+    getChildType :: AST.Operand -> Ty.Type
+    getChildType (AST.LocalReference Ty.StructureType{..} _) = head elementTypes
+    getChildType (AST.LocalReference Ty.ArrayType{..} _)     = elementType
 
 -------------------------------------------------------------------------------
 -- Compilation
@@ -329,11 +361,16 @@ liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
 codeGenMaybeWorks :: String -> Rum.Program -> IO AST.Module
-codeGenMaybeWorks moduleName program = withContext $ \context ->
-  liftError $ withModuleFromAST context llvmAST $ \m -> do
-    llstr <- moduleLLVMAssembly m
-    writeFile "local_example.ll" llstr
-    return llvmAST
+codeGenMaybeWorks moduleName program = do
+  putStrLn "BEFORE"
+  pPrint llvmAST
+  putStrLn "AFTER"
+  withContext $ \context ->
+    liftError $ withModuleFromAST context llvmAST $ \m -> do
+      putStrLn "INSIDE"
+      llstr <- moduleLLVMAssembly m
+      writeFile "local_example.ll" llstr
+      return llvmAST
   where
     llvmModule    = emptyModule moduleName
     generatedLLVM = codegenProgram program
