@@ -1,23 +1,18 @@
-{-# LANGUAGE LambdaCase #-}
+module Rum.StackMachine.Util where
 
-module Compiler.Rum.StackMachine.Util where
+import Control.Monad.State (State, get, gets, modify)
+import Data.IORef
+import Data.Maybe (fromMaybe)
+import Data.String (fromString)
+import Safe (headMay)
 
-import           Control.Monad.State                 ( State, get, gets, modify )
-import qualified Data.HashMap.Strict as HM           ( fromList, insert, lookup, empty )
-import           Data.Maybe                          ( fromMaybe )
-import           Data.IORef
-import           Data.String                         ( fromString )
-import           Safe                                ( headMay )
+import Rum.Internal.AST (Type (..), Variable)
+import Rum.Internal.Util
+import Rum.StackMachine.Structure (Instruction (..), InterpretStackType, LabelId, Labels,
+                                   RefSVarEnv, SRefType (..), StackEnvironment (..))
 
-import           Compiler.Rum.Internal.AST           ( Type(..), Variable)
-import           Compiler.Rum.Internal.Util
-import           Compiler.Rum.StackMachine.Structure ( Instruction(..)
-                                                     , InterpretStackType
-                                                     , LabelId, Labels
-                                                     , RefSVarEnv
-                                                     , StackEnvironment(..)
-                                                     , SRefType(..)
-                                                     )
+import qualified Data.HashMap.Strict as HM (empty, fromList, insert, lookup)
+
 
 -----------------
 -- Environment --

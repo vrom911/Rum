@@ -1,14 +1,28 @@
-module Compiler.Rum.Interpreter.Rummer where
+{- | Functions to run Rum's language interpreter
+-}
 
-import           Control.Applicative       (liftA2, empty)
-import           Control.Monad.State       (get, gets, lift, liftIO, modify, MonadState)
+module Rum.Interpreter.Rummer
+       ( rumInterpreter
+       )where
+
+import Control.Applicative (empty, liftA2)
+import Control.Monad.State (MonadState, get, gets, lift, liftIO, modify)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+
+import Rum.Internal.AST
+import Rum.Internal.Rumlude (runRumlude)
+import Rum.Internal.Util
+import Rum.Interpreter.Rumlude (preludeLibrary)
+
 import qualified Data.HashMap.Strict as HM (fromList, lookup)
-import           Data.IORef
 
-import           Compiler.Rum.Internal.AST
-import           Compiler.Rum.Internal.Rumlude (runRumlude)
-import           Compiler.Rum.Internal.Util
-import           Compiler.Rum.Interpreter.Rumlude (preludeLibrary)
+
+-------------------
+----- Rummer ------
+-------------------
+
+rumInterpreter :: [Statement] -> IO ()
+rumInterpreter p = runIOInterpret (interpret p) (Env mempty mempty preludeLibrary False)
 
 interpret :: Program -> InterpretT
 interpret [] = return Unit
@@ -23,7 +37,7 @@ interpretSt AssignmentVar{..}  = eval value >>= \x ->
     then do
         refs <- gets refVarEnv
         case HM.lookup var refs of
-            Just r -> liftIO $ writeIORef r (Val x) >> pure Unit
+            Just r  -> liftIO $ writeIORef r (Val x) >> pure Unit
             Nothing -> liftIO (newIORef$ Val x) >>= \rx -> modifyT (updateRefVars var rx)
     else modifyT (updateVars var x)
 interpretSt AssignmentArr{..}  = do
@@ -74,7 +88,7 @@ eval (ArrC ArrCell{..}) = do
         Just refvar -> liftIO $ readIORef refvar >>= fromRefTypeToIO >>= \x ->
                 return $ getArrsCell x inds
         Nothing -> gets (findVar arr) >>= \v -> case v of
-            Just v -> return $ getArrsCell v inds
+            Just v  -> return $ getArrsCell v inds
             Nothing -> empty
 eval (ArrLit exps) = Arr <$> mapM eval exps
 eval (Neg e)       = do
@@ -120,7 +134,7 @@ temp [] [] [] _ = (mempty, mempty)
 temp (v:vs) (e:es) (t:ts) env = case e of
     Var var -> let refVar = findRefVar var env in
         case refVar of
-            Just x -> ((v, t):l, (v, x): r)
+            Just x  -> ((v, t):l, (v, x): r)
             Nothing -> ((v, t):l, r)
     _ -> ((v, t):l, r)
   where
@@ -136,14 +150,9 @@ evalVar v = do
 --------------
 ---- Util ----
 --------------
+
 whenT :: (Applicative f) => Bool -> f Type -> f Type
 whenT cond s  = if cond then s else pure Unit
 
 modifyT :: MonadState s m => (s -> s) -> m Type
 modifyT f = modify f >> pure Unit
-
--------------------
------ Rummer ------
--------------------
-rumInterpreter :: [Statement] -> IO ()
-rumInterpreter p = runIOInterpret (interpret p) (Env mempty mempty preludeLibrary False)

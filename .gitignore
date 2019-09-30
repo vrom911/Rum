@@ -1,4 +1,5 @@
 dist
+dist-newstyle/
 cabal-dev
 *.o
 *.hi
@@ -14,6 +15,11 @@ cabal.sandbox.config
 *.aux
 *.hp
 .stack-work/
+stack.yaml.lock
+cabal.project.local
+cabal.project.local~
+.HTF/
+.ghc.environment.*
 
 .idea/
 *.un~

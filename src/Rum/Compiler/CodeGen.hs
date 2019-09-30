@@ -1,44 +1,42 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+module Rum.Compiler.CodeGen where
 
-module Compiler.Rum.Compiler.CodeGen where
+import Control.Monad.State (MonadState, State, execState, gets, modify, void)
+import Data.ByteString.Short (ShortByteString, toShort)
+import Data.Char (ord)
+import Data.Function (on)
+import Data.List (map, sortBy)
+import Data.Map (Map)
+import Data.Maybe (fromMaybe)
+import Data.String (fromString)
+import Data.Text (Text)
+import GHC.Word (Word32)
+import LLVM.AST (BasicBlock (..), Definition (..), Instruction (..), Module (..), Name (..),
+                 Named (..), Operand (..), Parameter (..), Terminator (..), defaultModule)
 
-import           Data.Char           (ord)
-import           Control.Monad.State (MonadState, State, execState, gets, modify, void)
-import           Data.Map            (Map)
-import qualified Data.Map as Map     (empty, insert, lookup, toList)
-import           Data.Maybe          (fromMaybe)
-import           Data.List           (map, sortBy)
-import           Data.Function       (on)
-import           Data.Text           (Text)
+import qualified Data.Map as Map (empty, insert, lookup, toList)
 import qualified Data.Text as T
-import           GHC.Word            (Word32)
-
-import qualified LLVM.AST.Global as G  (Global(..), functionDefaults, globalVariableDefaults)
+import qualified Data.Text.Encoding as T
 import qualified LLVM.AST as AST
-import qualified LLVM.AST.Type as Ty   (Type(..), i8, i32)
-import           LLVM.AST              ( BasicBlock(..), Definition(..)
-                                       , Instruction(..)
-                                       , Module(..), Name(..)
-                                       , Named(..)
-                                       , Operand(..), Parameter(..), Terminator(..)
-                                       , defaultModule
-                                       )
 import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.Constant as C
+import qualified LLVM.AST.Global as G (Global (..), functionDefaults, globalVariableDefaults)
 import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.Linkage as L
+import qualified LLVM.AST.Type as Ty (Type (..), i32, i8)
+
 
 -----------------------
 -------- Setup --------
 -----------------------
-newtype LLVM a = LLVM {stateLLVM :: State Module a}
-  deriving (Functor, Applicative, Monad, MonadState Module )
+newtype LLVM a = LLVM
+    { stateLLVM :: State Module a
+    } deriving (Functor, Applicative, Monad, MonadState Module)
 
 runLLVM :: Module -> LLVM a -> Module
 runLLVM modul l = execState (stateLLVM l) modul
 
-emptyModule :: String -> Module
+emptyModule :: ShortByteString -> Module
 emptyModule label = defaultModule { moduleName = label }
 
 addDefn :: Definition -> LLVM ()
@@ -47,17 +45,17 @@ addDefn def = gets moduleDefinitions >>= \defs ->
 
 defineFun ::  AST.Type -> Text -> [(AST.Type, Name)] -> [BasicBlock] -> LLVM ()
 defineFun retType funName argTypes body = addDefn $
-  GlobalDefinition $ G.functionDefaults {
-    G.name        = Name (T.unpack funName)
-  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], False)
-  , G.returnType  = retType
-  , G.basicBlocks = body
-  }
+    GlobalDefinition $ G.functionDefaults
+    { G.name        = Name (toShort $ T.encodeUtf8 funName)
+    , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], False)
+    , G.returnType  = retType
+    , G.basicBlocks = body
+    }
 
-defineIOStrVariable :: String -> String -> LLVM ()
+defineIOStrVariable :: ShortByteString -> String -> LLVM ()
 defineIOStrVariable varName formatString = addDefn $
-    GlobalDefinition $ G.globalVariableDefaults {
-      G.name        = Name varName
+    GlobalDefinition $ G.globalVariableDefaults
+    { G.name        = Name varName
     , G.type'       = Ty.ArrayType (fromIntegral $ length formatString) Ty.i8
     , G.isConstant  = True
     , G.initializer = Just $ C.Array Ty.i8 $ map (C.Int 8 . fromIntegral . ord) formatString
@@ -65,41 +63,46 @@ defineIOStrVariable varName formatString = addDefn $
 
 declareExtFun :: AST.Type -> Text -> [(AST.Type, Name)] -> Bool -> LLVM ()
 declareExtFun retType funName argTypes isVararg = addDefn $
-  GlobalDefinition $ G.functionDefaults {
-    G.name        = Name (T.unpack funName)
-  , G.linkage     = L.External
-  , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], isVararg)
-  , G.returnType  = retType
-  , G.basicBlocks = []
-  }
+    GlobalDefinition $ G.functionDefaults
+    { G.name        = Name (toShort $ T.encodeUtf8 funName)
+    , G.linkage     = L.External
+    , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], isVararg)
+    , G.returnType  = retType
+    , G.basicBlocks = []
+    }
 
 -----------------------------
 ------- Codegen State -------
 -----------------------------
+
 type SymbolTable = [(String, Operand)]
 
 -- toplevel module code generation
-data CodegenState
-  = CodegenState { currentBlock :: Name                     -- Name of the active block to append to
-                 , blocks       :: Map Name BlockState  -- Blocks for function
-                 , symTable     :: SymbolTable              -- Function scope symbol table
-                 , blockCount   :: Int                      -- Count of basic blocks
-                 , count        :: Word                     -- Count of unnamed instructions
-                 , names        :: Names                    -- Name Supply
-                 , varTypes     :: Map String Ty.Type
-                 } deriving Show
--- basic blocks inside of function definitions
-data BlockState
-    = BlockState { idx   :: Int                            -- Block index
-                 , stack :: [Named Instruction]            -- Stack of instructions
-                 , term  :: Maybe (Named Terminator)       -- Block terminator
-                 } deriving Show
+data CodegenState = CodegenState
+    { currentBlock :: Name                 -- ^ Name of the active block to append to
+    , blocks       :: Map Name BlockState  -- ^ Blocks for function
+    , symTable     :: SymbolTable          -- ^ Function scope symbol table
+    , blockCount   :: Int                  -- ^ Count of basic blocks
+    , count        :: Word                 -- ^ Count of unnamed instructions
+    , names        :: Names                -- ^ Name Supply
+    , varTypes     :: Map String Ty.Type
+    } deriving Show
 
-newtype Codegen a = Codegen { runCodegen :: State CodegenState a }
-  deriving (Functor, Applicative, Monad, MonadState CodegenState )
+-- basic blocks inside of function definitions
+data BlockState = BlockState
+    { idx   :: Int                       -- ^ Block index
+    , stack :: [Named Instruction]       -- ^ Stack of instructions
+    , term  :: Maybe (Named Terminator)  -- ^ Block terminator
+    } deriving Show
+
+newtype Codegen a = Codegen
+    { runCodegen :: State CodegenState a
+    } deriving (Functor, Applicative, Monad, MonadState CodegenState )
+
 ---------------------------
 ---------- Types ----------
 ---------------------------
+
 iType :: AST.Type
 iType = Ty.i32
 
@@ -109,13 +112,16 @@ iBits = 32
 -------------------------
 --------- Names ---------
 -------------------------
-type Names = Map String Int
 
-uniqueName :: String -> Names -> (String, Names)
-uniqueName nm ns =
-  case Map.lookup nm ns of
+type Names = Map ShortByteString Int
+
+uniqueName :: ShortByteString -> Names -> (ShortByteString, Names)
+uniqueName nm ns = case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
-    Just ix -> (nm ++ show ix, Map.insert nm (ix+1) ns)
+    Just ix ->
+        (nm <> toShort (T.encodeUtf8 $ T.pack $ show ix)
+        , Map.insert nm (ix + 1) ns
+        )
 
 ------------------------------
 ----- Codegen Operations -----
@@ -132,7 +138,7 @@ makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (makeTerm t)
   where
     makeTerm = fromMaybe (error $ "Block has no terminator: " ++ show l)
 
-entryBlockName :: String
+entryBlockName :: ShortByteString
 entryBlockName = "entry"
 
 emptyBlock :: Int -> BlockState
@@ -146,19 +152,19 @@ execCodegen m = execState (runCodegen m) emptyCodegen
 
 fresh :: Codegen Word
 fresh = do
-  i <- gets count
-  let iNew = succ i
-  modify $ \s -> s { count = iNew }
-  return iNew
+    i <- gets count
+    let iNew = succ i
+    modify $ \s -> s { count = iNew }
+    return iNew
 
 tyInstr :: Ty.Type -> Instruction -> Codegen Operand
 tyInstr t ins = do
-  nm <- fresh
-  let ref = UnName nm
-  blk <- current
-  let i = stack blk
-  modifyBlock (blk { stack = (ref := ins) : i } )
-  return $ local t ref
+    nm <- fresh
+    let ref = UnName nm
+    blk <- current
+    let i = stack blk
+    modifyBlock (blk { stack = (ref := ins) : i } )
+    return $ local t ref
 
 instr :: Instruction -> Codegen Operand
 instr = tyInstr iType
@@ -181,29 +187,32 @@ terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
   curBlock <- current
   case term curBlock of
-      Just oldTrm -> return oldTrm
-      Nothing            -> do
+      Just oldTrm -> pure oldTrm
+      Nothing -> do
           modifyBlock (curBlock { term = Just trm })
-          return trm
+          pure trm
 
 -------------------------------
 --------- Block Stack ---------
 -------------------------------
+
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: String -> Codegen Name
+addBlock :: ShortByteString -> Codegen Name
 addBlock bname = do
-  bls <- gets blocks
-  ix  <- gets blockCount
-  nms <- gets names
-  let new = emptyBlock ix
-  let (qname, supply) = uniqueName bname nms
-  modify $ \s -> s { blocks = Map.insert (Name qname) new bls
-                   , blockCount = succ ix
-                   , names = supply
-                   }
-  return $ Name qname
+    bls <- gets blocks
+    ix  <- gets blockCount
+    nms <- gets names
+    let new = emptyBlock ix
+    let (qname, supply) = uniqueName bname nms
+    let n = Name qname
+    modify $ \s -> s
+        { blocks = Map.insert n new bls
+        , blockCount = succ ix
+        , names = supply
+        }
+    pure n
 
 setBlock :: Name -> Codegen ()
 setBlock bname = modify (\s -> s { currentBlock = bname })
@@ -213,7 +222,7 @@ getBlock = gets currentBlock
 
 modifyBlock :: BlockState -> Codegen ()
 modifyBlock new = getBlock >>= \active ->
-  modify (\s -> s { blocks = Map.insert active new (blocks s) })
+    modify (\s -> s { blocks = Map.insert active new (blocks s) })
 
 current :: Codegen BlockState
 current = getBlock >>= \c -> gets blocks >>= \blks ->
@@ -247,27 +256,16 @@ externf ty = ConstantOperand . global ty
 ----------------------------------
 ---- Arithmetic and Constants ----
 ----------------------------------
-iAdd :: Operand -> Operand -> Codegen Operand
+iAdd, iSub, iMul, iDiv, iMod, lAnd, lOr :: Operand -> Operand -> Codegen Operand
 iAdd a b = instr $ Add False False a b []
-
-iSub :: Operand -> Operand -> Codegen Operand
 iSub a b = instr $ Sub False False a b []
-
-iMul :: Operand -> Operand -> Codegen Operand
 iMul a b = instr $ Mul False False a b []
-
-iDiv :: Operand -> Operand -> Codegen Operand
 iDiv a b = instr $ SDiv False a b []
-
-iMod :: Operand -> Operand -> Codegen Operand
 iMod a b = instr $ SRem a b []
 
 --- logic operations ---
-lAnd :: Operand -> Operand -> Codegen Operand
 lAnd a b = instr $ And a b []
-
-lOr :: Operand -> Operand -> Codegen Operand
-lOr a b = instr $ Or a b []
+lOr  a b = instr $ Or a b []
 
 ---  compare operations ---
 
@@ -355,4 +353,3 @@ typeOfOperand (AST.ConstantOperand C.Int{..}) = iType
 typeOfOperand (AST.ConstantOperand (C.GlobalReference t _ )) = t
 typeOfOperand (AST.ConstantOperand C.Array{..}) = AST.ArrayType (fromIntegral $ length memberValues) memberType
 typeOfOperand _ = iType
-

@@ -1,24 +1,38 @@
-module Compiler.Rum.Compiler.Emitter where
+module Rum.Compiler.Emitter where
 
-import           Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
-import           Control.Monad.State
-import           Data.Char            (isUpper, ord)
-import           Data.Map             (Map)
-import qualified Data.Map as Map      (fromList, lookup)
+import Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
+import Control.Monad.State
+import Data.ByteString.Short (ShortByteString, toShort)
+import Data.Char (isUpper, ord)
+import Data.Map (Map)
+import LLVM.Context (withContext)
+import LLVM.Module (moduleLLVMAssembly, withModuleFromAST)
+
+import Rum.Compiler.CodeGen (Codegen, CodegenState (..), LLVM, addBlock, alloca, assign, br, call,
+                             cbr, cons, createBlocks, declareExtFun, defineFun, emptyModule,
+                             entryBlockName, execCodegen, externf, getElementPtr, getVar, iAdd,
+                             iBits, iDiv, iEq, iGt, iLt, iMod, iMul, iNeq, iNotGt, iNotLt, iSub,
+                             iType, iZero, isFalse, isTrue, lAnd, lOr, load, local, ret, runLLVM,
+                             setBlock, store, typeOfOperand)
+
+import qualified Data.ByteString.Char8 as BS
+import qualified Data.Map as Map (fromList, lookup)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
+import qualified LLVM.AST as AST (Module (..), Name (..), Operand (..), Type (..))
+import qualified LLVM.AST.Constant as C (Constant (..))
+import qualified LLVM.AST.Type as Ty
 
-import qualified LLVM.AST as AST            (Operand(..), Type(..), Module(..), Name(..), Operand(..))
-import qualified LLVM.AST.Constant as C     (Constant(..))
-import qualified LLVM.AST.Type     as Ty
-import           LLVM.Context               (withContext)
-import           LLVM.Module                (moduleLLVMAssembly, withModuleFromAST)
+import qualified Rum.Internal.AST as Rum
 
-import           Compiler.Rum.Compiler.CodeGen
-import qualified Compiler.Rum.Internal.AST as Rum
 
 toSig :: [Rum.Variable] -> [(AST.Type, AST.Name)]
 toSig = let nm = T.unpack . Rum.varName in
-        map (\x -> (if isUpper $ head (nm x) then Ty.ptr Ty.i8 else iType, AST.Name (nm x)))
+    map ( \x ->
+          ( if isUpper $ head (nm x) then Ty.ptr Ty.i8 else iType
+          , AST.Name (toShort $ T.encodeUtf8 $ Rum.varName x)
+          )
+        )
 
 -- Fun declarations + main body
 codeGenAll :: Rum.Program -> LLVM ()
@@ -27,7 +41,7 @@ codeGenAll pr = let (funs, main) = span isFunDeclSt pr in
   where
     isFunDeclSt :: Rum.Statement -> Bool
     isFunDeclSt Rum.Fun{} = True
-    isFunDeclSt _     = False
+    isFunDeclSt _         = False
 
 -- Deal with std funs
 codegenProgram :: Rum.Program -> LLVM ()
@@ -61,16 +75,16 @@ codeGenTop Rum.Fun{..} = defineFun iType (Rum.varName funName) fnargs bls
   where
     fnargs = toSig params
     bls = createBlocks $ execCodegen $ do
-      entr <- addBlock entryBlockName
-      setBlock entr
-      forM_ params $ \a -> do
-        let aName = T.unpack $ Rum.varName a
---        let aType = typeOfOperand a
-        let t = if isUpper $ head aName then Ty.ptr Ty.i8 else iType
-        var <- alloca t
-        () <$ store var (local t (AST.Name aName))
-        assign aName var
-      codeGenFunProg funBody >>= ret
+        entr <- addBlock entryBlockName
+        setBlock entr
+        forM_ params $ \a -> do
+            let aName = T.unpack $ Rum.varName a
+--            let aType = typeOfOperand a
+            let t = if isUpper $ head aName then Ty.ptr Ty.i8 else iType
+            var <- alloca t
+            () <$ store var (local t (AST.Name $ toShort $ T.encodeUtf8 $ Rum.varName a))
+            assign aName var
+        codeGenFunProg funBody >>= ret
 codeGenTop _ = error "Impossible happened in CodeGenTop. Only fun Declarations allowed!"
 
 -- Deal with stmts after all fun declarations (main)
@@ -193,19 +207,32 @@ codeGenStmt Rum.For{..} = do
     return ()
 
 binOps :: Map Rum.BinOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-binOps = Map.fromList [ (Rum.Add, iAdd), (Rum.Sub, iSub)
-                      , (Rum.Mul, iMul), (Rum.Div, iDiv)
-                      , (Rum.Mod, iMod)]
+binOps = Map.fromList
+    [ (Rum.Add, iAdd)
+    , (Rum.Sub, iSub)
+    , (Rum.Mul, iMul)
+    , (Rum.Div, iDiv)
+    , (Rum.Mod, iMod)
+    ]
+
 logicOps :: Map Rum.LogicOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-logicOps = Map.fromList [(Rum.And, lAnd), (Rum.Or, lOr)]
+logicOps = Map.fromList
+    [ (Rum.And, lAnd)
+    , (Rum.Or, lOr)
+    ]
+
 compOps :: Map Rum.CompOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
-compOps = Map.fromList [ (Rum.Eq, iEq), (Rum.NotEq, iNeq)
-                       , (Rum.Lt, iLt), (Rum.Gt, iGt)
-                       , (Rum.NotGt, iNotGt), (Rum.NotLt, iNotLt)
-                       ]
+compOps = Map.fromList
+    [ (Rum.Eq, iEq)
+    , (Rum.NotEq, iNeq)
+    , (Rum.Lt, iLt)
+    , (Rum.Gt, iGt)
+    , (Rum.NotGt, iNotGt)
+    , (Rum.NotLt, iNotLt)
+    ]
 
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
-cgenExpr (Rum.Const (Rum.Number c)) = return $ cons (C.Int iBits (fromIntegral c))
+cgenExpr (Rum.Const (Rum.Number c)) = pure $ cons (C.Int iBits (fromIntegral c))
 cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons (C.Int 8 (fromIntegral $ ord c))
 cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
                                     map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
@@ -244,8 +271,8 @@ codeGenFunCall Rum.FunCall{..} =
     let funNm = T.unpack $ Rum.varName fName in
     mapM modifiedCgenExpr args >>= \largs ->
             case Map.lookup funNm rumFunNamesMap of
-                Just (n, t) -> call (externf t (AST.Name n)) largs
-                Nothing -> call (externf iType (AST.Name funNm)) largs
+                Just (n, t) -> call (externf t (AST.Name $ toShort $ BS.pack n)) largs
+                Nothing     -> call (externf iType (AST.Name $ toShort $ BS.pack funNm)) largs
 
 modifiedCgenExpr :: Rum.Expression -> Codegen AST.Operand
 modifiedCgenExpr str@(Rum.Const (Rum.Str _)) = do
@@ -259,12 +286,12 @@ modifiedCgenExpr x = cgenExpr x
 liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
-codeGenMaybeWorks :: String -> Rum.Program -> IO AST.Module
+codeGenMaybeWorks :: ShortByteString -> Rum.Program -> IO AST.Module
 codeGenMaybeWorks moduleName program = withContext $ \context ->
-  liftError $ withModuleFromAST context llvmAST $ \m -> do
-    llstr <- moduleLLVMAssembly m
-    writeFile "local_example.ll" llstr
-    return llvmAST
+    withModuleFromAST context llvmAST $ \m -> do
+        llstr <- moduleLLVMAssembly m
+        writeFile "local_example.ll" $ BS.unpack llstr
+        pure llvmAST
   where
     llvmModule    = emptyModule moduleName
     generatedLLVM = codegenProgram program

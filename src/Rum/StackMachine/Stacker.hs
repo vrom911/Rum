@@ -1,21 +1,30 @@
-module Compiler.Rum.StackMachine.Stacker where
+module Rum.StackMachine.Stacker
+       ( rumStacker
+       ) where
 
-import           Control.Monad.State        ( evalState, evalStateT, execStateT, get
-                                            , gets, liftIO, modify, replicateM
-                                            , unless, when
-                                            )
-import           Control.Monad.Trans.Reader (ask, asks, runReaderT)
-import qualified Data.HashMap.Strict as HM  (lookup)
-import           Data.Maybe                 (fromMaybe)
-import           Data.IORef
-import           Text.Read                  (readMaybe)
+import Control.Monad.State (evalState, evalStateT, execStateT, get, gets, liftIO, modify,
+                            replicateM, unless, when)
+import Control.Monad.Trans.Reader (ask, asks, runReaderT)
+import Data.IORef
+import Data.Maybe (fromMaybe)
+import Text.Read (readMaybe)
 
-import qualified Compiler.Rum.Internal.AST as AST
-import Compiler.Rum.Internal.Util
-import Compiler.Rum.Internal.Rumlude
-import Compiler.Rum.StackMachine.Structure
-import Compiler.Rum.StackMachine.Translator (translateP)
-import Compiler.Rum.StackMachine.Util
+import Rum.Internal.Rumlude
+import Rum.Internal.Util
+import Rum.StackMachine.Structure
+import Rum.StackMachine.Translator (translateP)
+import Rum.StackMachine.Util
+
+import qualified Data.HashMap.Strict as HM (lookup)
+import qualified Rum.Internal.AST as AST
+
+
+rumStacker :: AST.Program -> IO ()
+rumStacker p = do
+    let instrs = evalState (translateP p) 0
+--    putStrLn $ unlines $ map show instrs
+    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)
+
 
 stacker :: InterpretStack
 stacker = startPosition >> execute
@@ -35,7 +44,7 @@ execute = do
   where
     isReturn :: Instruction -> Bool
     isReturn SReturn = True
-    isReturn _ = False
+    isReturn _       = False
 
     executeInstr :: Instruction -> InterpretStack
     executeInstr Nop        = return ()
@@ -63,11 +72,11 @@ execute = do
             pop >> gets takeStack >>= \x ->
                 pop >> push (intCompare c x y)
     executeInstr (Load v) = gets (findSVar v) >>= \x -> case x of
-        Val y -> push y
+        Val y    -> push y
         RefVal y -> liftIO (readIORef y) >>= push
     executeInstr (LoadRef v) = gets (findSVar v) >>= \x -> case x of
             RefVal y -> liftIO (readIORef y) >>= push
-            Val y -> push y
+            Val y    -> push y
     executeInstr (Store v) =
         if not (isUp v) then modify (updateSmallVars v) >> pop
             else do
@@ -100,9 +109,3 @@ execute = do
     push = modify . pushStack
     pop :: InterpretStack
     pop = modify popStack
-
-rumStacker :: AST.Program -> IO ()
-rumStacker p = do
-    let instrs = evalState (translateP p) 0
---    putStrLn $ unlines $ map show instrs
-    evalStateT (runReaderT stacker (instrs, buildLabelsMap instrs)) (SEnv emptyVars [] 0)

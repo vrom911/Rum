@@ -1,16 +1,18 @@
-module Compiler.Rum.Internal.Util where
+module Rum.Internal.Util where
 
-import           Control.Monad             ((>=>))
-import           Control.Monad.State       (evalStateT)
-import           Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import           Data.Bool                 (bool)
-import           Data.Char                 (isUpper)
+import Control.Monad ((>=>))
+import Control.Monad.State (evalStateT)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import Data.Bool (bool)
+import Data.Char (isUpper)
+import Data.IORef
+import Data.List (foldl')
+
+import Rum.Internal.AST
+
 import qualified Data.HashMap.Strict as HM (insert, lookup)
-import           Data.IORef
-import           Data.List                 (foldl')
 import qualified Data.Text as T
 
-import           Compiler.Rum.Internal.AST
 
 -------------------------
 --- Environment Stuff ---
@@ -68,7 +70,7 @@ findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> InterpretT)
 findFun x Env{..} = HM.lookup x funEnv
 
 fromRefTypeToIO :: RefType -> IO Type
-fromRefTypeToIO (Val v) = pure v
+fromRefTypeToIO (Val v)      = pure v
 fromRefTypeToIO (ArrayRef a) = Arr <$> mapM (readIORef >=> fromRefTypeToIO) a
 -------------------------
 

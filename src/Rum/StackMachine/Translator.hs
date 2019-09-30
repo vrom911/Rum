@@ -1,20 +1,22 @@
-module Compiler.Rum.StackMachine.Translator where
+module Rum.StackMachine.Translator where
 
-import           Control.Monad.Extra       (concatMapM)
+import Control.Monad.Extra (concatMapM)
+
+import Rum.Internal.AST
+import Rum.Internal.Rumlude
+import Rum.Internal.Util
+import Rum.StackMachine.Structure
+import Rum.StackMachine.Util
+
 import qualified Data.HashMap.Strict as HM
 
-import Compiler.Rum.Internal.AST
-import Compiler.Rum.Internal.Rumlude
-import Compiler.Rum.Internal.Util
-import Compiler.Rum.StackMachine.Structure
-import Compiler.Rum.StackMachine.Util
 
 translateP :: Program -> Instructions
 translateP pr = let (funs, rest) = span isFun pr in
     translate funs >>= \f -> translate rest >>= \r -> pure $ f ++ [Label "start"] ++ r
   where
     isFun Fun{} = True
-    isFun _ = False
+    isFun _     = False
 
 translate :: Program -> Instructions
 translate = concatMapM translateStmt

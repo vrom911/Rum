@@ -1,78 +1,115 @@
-name:                Compiler
-version:             0.1.0.0
--- synopsis:
--- description:
-homepage:            https://github.com/vrom911/Compiler#readme
-license:             BSD3
+cabal-version:       2.4
+name:                Rum
+version:             0.0.0.0
+synopsis:            Rum language
+description:         Type-safe memory units
+homepage:            https://github.com/vrom911/Rum#readme
+bug-reports:         https://github.com/vrom911/Rum/issues
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Veronika Romashkina
-maintainer:          vrom911@gmail.com
-copyright:           2017 vrom911
+maintainer:          Veronika Romashkina <vrom911@gmail.com>
+copyright:           2017-2019 vrom911
 category:            Compiler
 build-type:          Simple
-extra-source-files:  README.md
-cabal-version:       >=1.10
+extra-doc-files:     README.md
+                   , CHANGELOG.md
+tested-with:         GHC == 8.6.5
+
+source-repository head
+  type:                git
+  location:            https://github.com/vrom911/Rum.git
+
+common common-options
+  build-depends:       base ^>= 4.12.0.0
+
+  ghc-options:         -Wall
+                       -Wincomplete-uni-patterns
+                       -Wincomplete-record-updates
+                       -Wcompat
+                       -Widentities
+                       -Wredundant-constraints
+                       -Wmissing-export-lists
+                       -Wpartial-fields
+                       -fhide-source-paths
+
+  default-language:    Haskell2010
+  default-extensions:  BangPatterns
+                       ConstraintKinds
+                       DataKinds
+                       DeriveAnyClass
+                       DeriveGeneric
+                       DerivingStrategies
+                       DerivingVia
+                       FlexibleContexts
+                       FlexibleInstances
+                       GeneralizedNewtypeDeriving
+                       InstanceSigs
+                       KindSignatures
+                       LambdaCase
+                       MultiParamTypeClasses
+                       OverloadedStrings
+                       OverloadedLabels
+                       RecordWildCards
+                       ScopedTypeVariables
+                       TypeApplications
+                       TypeFamilies
+                       TypeOperators
+                       ViewPatterns
 
 library
+  import:              common-options
   hs-source-dirs:      src
-  exposed-modules:     Compiler.Rum.Internal.AST
-                       Compiler.Rum.Internal.Rumlude
-                       Compiler.Rum.Internal.ToString
-                       Compiler.Rum.Internal.Util
-                       Compiler.Rum.Internal.Parser
-                       Compiler.Rum.Interpreter.Rumlude
-                       Compiler.Rum.Interpreter.Rummer
-                       Compiler.Rum.StackMachine.Stacker
-                       Compiler.Rum.StackMachine.Structure
-                       Compiler.Rum.StackMachine.Translator
-                       Compiler.Rum.StackMachine.Util
-                       Compiler.Rum.Compiler.CodeGen
-                       Compiler.Rum.Compiler.Emitter
-                       Compiler.Rum.Compiler.Rummer
-                       Compiler.Rum.Compiler.JIT
-  build-depends:       base >= 4.7 && < 5
-                     , containers
+  exposed-modules:     Rum.Internal.AST
+                       Rum.Internal.Rumlude
+                       Rum.Internal.ToString
+                       Rum.Internal.Util
+                       Rum.Internal.Parser
+                       Rum.Interpreter.Rumlude
+                       Rum.Interpreter.Rummer
+                       Rum.StackMachine.Stacker
+                       Rum.StackMachine.Structure
+                       Rum.StackMachine.Translator
+                       Rum.StackMachine.Util
+                       Rum.Compiler.CodeGen
+                       Rum.Compiler.Emitter
+                       Rum.Compiler.Rummer
+                       Rum.Compiler.JIT
+  build-depends:       containers
+                     , bytestring >= 0.10
                      , hashable
                      , extra
                      , llvm-hs
                      , llvm-hs-pure
                      , megaparsec
                      , mtl
+                     , parser-combinators
                      , safe
                      , text
                      , transformers
                      , unordered-containers
-  default-extensions: OverloadedStrings
-                      RecordWildCards
-  default-language:    Haskell2010
-  ghc-options:         -Wall -fno-warn-unused-do-bind -dynamic
+  ghc-options:         -dynamic
 
-  Include-dirs:        runtime
-  C-sources:           runtime/runtime.c
+  include-dirs:        runtime
+  c-sources:           runtime/runtime.c
 
-executable Compiler
+executable Rum
+  import:              common-options
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , Compiler
+  build-depends:       Rum
                      , megaparsec
                      , text
-  default-extensions: OverloadedStrings
-  default-language:    Haskell2010
-  ghc-options:         -Wall -dynamic
+  ghc-options:         -dynamic
 
-test-suite Compiler-test
+test-suite Rum-test
+  import:              common-options
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  build-depends:       base
-                     , Compiler
+  build-depends:       Rum
                      , hspec
                      , QuickCheck
+  build-tool-depends:  hspec-discover:hspec-discover
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-  default-language:    Haskell2010
-
-source-repository head
-  type:     git
-  location: https://github.com/vrom911/Compiler

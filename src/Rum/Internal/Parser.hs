@@ -1,22 +1,25 @@
-module Compiler.Rum.Internal.Parser where
+module Rum.Internal.Parser where
 
 
-import           Control.Applicative    ((<|>), liftA2)
-import           Data.String            (fromString)
-import           Data.Text              (Text)
+import Control.Applicative (liftA2, (<|>))
+import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
+import Data.String (fromString)
+import Data.Text (Text)
+import Data.Void (Void)
+import Text.Megaparsec (Parsec, anySingle, between, many, manyTill, notFollowedBy, oneOf, option,
+                        optional, sepBy, some, try)
+import Text.Megaparsec.Char (alphaNumChar, char, digitChar, letterChar, space, string)
+
+import Rum.Internal.AST
+
 import qualified Data.Text as T
-import           Text.Megaparsec        ( anyChar, alphaNumChar, between, char
-                                        , digitChar, letterChar, many, manyTill
-                                        , notFollowedBy, oneOf, option, optional
-                                        , sepBy, some, space, string, try
-                                        )
-import Text.Megaparsec.Expr             (Operator(..), makeExprParser)
-import Text.Megaparsec.Text             (Parser)
 
-import Compiler.Rum.Internal.AST
+
+-- | The parser
+type Parser = Parsec Void Text
 
 text :: String -> Parser Text
-text t = T.pack <$> string t
+text = string . T.pack
 
 txtSpace :: String -> Parser Text
 txtSpace s = text s >>= \x -> space >> return x
@@ -37,10 +40,10 @@ numP :: Parser Int
 numP = (read <$> some digitChar) <* space
 
 charP :: Parser Char
-charP = between (char '\'') (char '\'') anyChar <* space
+charP = between (char '\'') (char '\'') anySingle <* space
 
 txtP :: Parser Text
-txtP = T.pack <$> (char '"' *> anyChar `manyTill` char '"' <* space)
+txtP = T.pack <$> (char '"' *> anySingle `manyTill` char '"' <* space)
 
 boolP :: Parser Int
 boolP = (1 <$ text "true" <|> 0 <$ text "false") <* space
@@ -68,7 +71,7 @@ varOrArrP = do
     arName <- varNameP
     ex <- optional $ some $ between (txtSpace "[") (txtSpace "]") exprP
     case ex of
-        Nothing -> return $ Var arName
+        Nothing  -> return $ Var arName
         Just exs -> return $ ArrC $ ArrCell arName exs
 
 arrP :: Parser [Expression]

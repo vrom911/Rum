@@ -1,17 +1,19 @@
-module Compiler.Rum.Internal.ToString where
+module Rum.Internal.ToString where
 
-import           Data.Monoid ((<>))
-import           Data.Text (Text)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+
+import Rum.Internal.AST
+
 import qualified Data.Text as T
 
-import Compiler.Rum.Internal.AST
 
 tab :: Int -> Text
 tab n = T.cons '\n' (T.replicate (2*n) " ")
 
 progToStr :: Int -> Program -> Text
-progToStr _ [] = ""
-progToStr n [x] = stmtToStr n x
+progToStr _ []         = ""
+progToStr n [x]        = stmtToStr n x
 progToStr n (x1:x2:xs) = stmtToStr n x1 <> ";" <> progToStr n (x2:xs)
 
 
@@ -41,15 +43,15 @@ stmtToStr n Return{..}      = tab n <> "return " <> exprToStr retExp
 stmtToStr n (FunCallStmt f) = tab n <> funCallToStr f
 
 exprToStr :: Expression -> Text
-exprToStr (Const c)     = typeToStr c
-exprToStr (ArrC arC)    = arrCellToStr arC
-exprToStr (ArrLit lits) = "[" <> expListStr lits <> "]"
-exprToStr (Var v)       = varName v
-exprToStr (Neg e)       = "-(" <> exprToStr e <> ")"
-exprToStr BinOper{..}   = paren l <> bToStr bop <> paren r
-exprToStr LogicOper{..} = paren l <> lToStr lop <> paren r
-exprToStr CompOper{..}  = paren l <> cToStr cop <> paren r
-exprToStr (FunCallExp f)= funCallToStr f
+exprToStr (Const c)      = typeToStr c
+exprToStr (ArrC arC)     = arrCellToStr arC
+exprToStr (ArrLit lits)  = "[" <> expListStr lits <> "]"
+exprToStr (Var v)        = varName v
+exprToStr (Neg e)        = "-(" <> exprToStr e <> ")"
+exprToStr BinOper{..}    = paren l <> bToStr bop <> paren r
+exprToStr LogicOper{..}  = paren l <> lToStr lop <> paren r
+exprToStr CompOper{..}   = paren l <> cToStr cop <> paren r
+exprToStr (FunCallExp f)=funCallToStr f
 
 arrCellToStr :: ArrCell -> Text
 arrCellToStr ArrCell{..} =  varName arr <> T.concat (map (\i -> "[" <> exprToStr i <> "]") index)
