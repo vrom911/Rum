@@ -9,7 +9,9 @@ import Control.Applicative (empty, liftA2)
 import Control.Monad.State (MonadState, get, gets, lift, liftIO, modify)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 
-import Rum.Internal.AST
+import Rum.Internal.AST (ArrCell (..), Environment (..), Expression (..), FunCall (..),
+                         Interpret (..), InterpretT, Program, RefType (..), RumludeFunName (..),
+                         Statement (..), Type (..), Variable (..))
 import Rum.Internal.Rumlude (runRumlude)
 import Rum.Internal.Util
 import Rum.Interpreter.Rumlude (preludeLibrary)
@@ -17,12 +19,10 @@ import Rum.Interpreter.Rumlude (preludeLibrary)
 import qualified Data.HashMap.Strict as HM (fromList, lookup)
 
 
--------------------
------ Rummer ------
--------------------
-
 rumInterpreter :: [Statement] -> IO ()
-rumInterpreter p = runIOInterpret (interpret p) (Env mempty mempty preludeLibrary False)
+rumInterpreter p = runIOInterpret
+    (interpret p)
+    (Env mempty mempty preludeLibrary False)
 
 interpret :: Program -> InterpretT
 interpret [] = return Unit
@@ -147,6 +147,7 @@ evalVar v = do
     case var of
         Just x  -> pure x
         Nothing -> empty
+
 --------------
 ---- Util ----
 --------------

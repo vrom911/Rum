@@ -12,15 +12,15 @@ module Rum.StackMachine.Structure
        , RumludeFunNamesMap
        ) where
 
-import Control.Monad.State
-import Control.Monad.Trans.Reader
+import Control.Monad.State (State, StateT)
+import Control.Monad.Trans.Reader (ReaderT)
 import Data.Hashable (Hashable)
 import Data.IORef (IORef)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
-import Rum.Internal.AST
+import Rum.Internal.AST ( Type, RumludeFunName, Variable, LogicOp, BinOp, CompOp)
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T

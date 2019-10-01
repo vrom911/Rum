@@ -1,13 +1,36 @@
-module Rum.StackMachine.Util where
+module Rum.StackMachine.Util
+       ( -- * Environment
+         updateSmallVars
+       , updateSVars
+       , findSVar
+
+       , getSArrayCell
+       , updateSArrs
+       , updatePos
+       , succPos
+
+       , pushStack
+       , popStack
+       , takeStack
+       , takePopStack
+       , popNstack
+       , emptyVars
+
+         -- * Label
+       , buildLabel
+       , newLabel
+       , buildLabelsMap
+       , findLabel
+       ) where
 
 import Control.Monad.State (State, get, gets, modify)
-import Data.IORef
+import Data.IORef (readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
 import Data.String (fromString)
 import Safe (headMay)
 
 import Rum.Internal.AST (Type (..), Variable)
-import Rum.Internal.Util
+import Rum.Internal.Util (getArrsCell, setArrsCell)
 import Rum.StackMachine.Structure (Instruction (..), InterpretStackType, LabelId, Labels,
                                    RefSVarEnv, SRefType (..), StackEnvironment (..))
 

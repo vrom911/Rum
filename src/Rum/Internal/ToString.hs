@@ -1,9 +1,12 @@
-module Rum.Internal.ToString where
+module Rum.Internal.ToString
+       ( progToStr
+       ) where
 
 import Data.Monoid ((<>))
 import Data.Text (Text)
 
-import Rum.Internal.AST
+import Rum.Internal.AST (ArrCell (..), BinOp (..), CompOp (..), Expression (..), FunCall (..),
+                         LogicOp (..), Program, Statement (..), Type (..), Variable (..))
 
 import qualified Data.Text as T
 

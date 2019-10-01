@@ -1,4 +1,73 @@
-module Rum.Compiler.CodeGen where
+module Rum.Compiler.CodeGen
+       ( LLVM (..)
+       , runLLVM
+       , defineFun
+       , defineIOStrVariable
+       , declareExtFun
+       , emptyModule
+
+         -- * Codegen State
+       , CodegenState (..)
+       , Codegen (..)
+
+         -- * Helper functions for 'AST.Type'
+       , iType
+       , iBits
+
+         -- * Codegen Operations
+       , createBlocks
+       , entryBlockName
+       , execCodegen
+
+         -- * Block Stack
+       , addBlock
+       , setBlock
+       , getBlock
+       , modifyBlock
+
+         -- * Symbol Table
+       , assign
+       , getVar
+
+         -- * References
+       , local
+       , global
+       , externf
+
+         -- * Arithmetic operations and Constants
+       , iAdd
+       , iSub
+       , iMul
+       , iDiv
+       , iMod
+       , lAnd
+       , lOr
+       , iCmp
+       , bNeq
+       , iEq
+       , iNeq
+       , iLt
+       , iGt
+       , iNotLt
+       , iNotGt
+
+       , cons
+       , iZero
+       , isTrue
+       , isFalse
+       , toArgs
+       , call
+       , alloca
+       , store
+       , load
+       , getElementPtr
+
+         -- * Control Flow
+       , br
+       , cbr
+       , ret
+       , typeOfOperand
+       ) where
 
 import Control.Monad.State (MonadState, State, execState, gets, modify, void)
 import Data.ByteString.Short (ShortByteString, toShort)
@@ -7,7 +76,6 @@ import Data.Function (on)
 import Data.List (map, sortBy)
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
-import Data.String (fromString)
 import Data.Text (Text)
 import GHC.Word (Word32)
 import LLVM.AST (BasicBlock (..), Definition (..), Instruction (..), Module (..), Name (..),
@@ -31,7 +99,7 @@ import qualified LLVM.AST.Type as Ty (Type (..), i32, i8)
 -----------------------
 newtype LLVM a = LLVM
     { stateLLVM :: State Module a
-    } deriving (Functor, Applicative, Monad, MonadState Module)
+    } deriving newtype (Functor, Applicative, Monad, MonadState Module)
 
 runLLVM :: Module -> LLVM a -> Module
 runLLVM modul l = execState (stateLLVM l) modul
@@ -79,25 +147,25 @@ type SymbolTable = [(String, Operand)]
 
 -- toplevel module code generation
 data CodegenState = CodegenState
-    { currentBlock :: Name                 -- ^ Name of the active block to append to
-    , blocks       :: Map Name BlockState  -- ^ Blocks for function
-    , symTable     :: SymbolTable          -- ^ Function scope symbol table
-    , blockCount   :: Int                  -- ^ Count of basic blocks
-    , count        :: Word                 -- ^ Count of unnamed instructions
-    , names        :: Names                -- ^ Name Supply
-    , varTypes     :: Map String Ty.Type
-    } deriving Show
+    { currentBlock :: !Name                   -- ^ Name of the active block to append to
+    , blocks       :: !(Map Name BlockState)  -- ^ Blocks for function
+    , symTable     :: !SymbolTable            -- ^ Function scope symbol table
+    , blockCount   :: !Int                    -- ^ Count of basic blocks
+    , count        :: !Word                   -- ^ Count of unnamed instructions
+    , names        :: !Names                  -- ^ Name Supply
+    , varTypes     :: !(Map String Ty.Type)
+    } deriving stock (Show)
 
 -- basic blocks inside of function definitions
 data BlockState = BlockState
-    { idx   :: Int                       -- ^ Block index
-    , stack :: [Named Instruction]       -- ^ Stack of instructions
-    , term  :: Maybe (Named Terminator)  -- ^ Block terminator
-    } deriving Show
+    { idx   :: !Int                         -- ^ Block index
+    , stack :: ![Named Instruction]         -- ^ Stack of instructions
+    , term  :: !(Maybe (Named Terminator))  -- ^ Block terminator
+    } deriving stock (Show)
 
 newtype Codegen a = Codegen
     { runCodegen :: State CodegenState a
-    } deriving (Functor, Applicative, Monad, MonadState CodegenState )
+    } deriving newtype (Functor, Applicative, Monad, MonadState CodegenState )
 
 ---------------------------
 ---------- Types ----------
@@ -195,9 +263,6 @@ terminator trm = do
 -------------------------------
 --------- Block Stack ---------
 -------------------------------
-
-entry :: Codegen Name
-entry = gets currentBlock
 
 addBlock :: ShortByteString -> Codegen Name
 addBlock bname = do

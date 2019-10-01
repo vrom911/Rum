@@ -1,7 +1,10 @@
-module Rum.Compiler.Emitter where
+module Rum.Compiler.Emitter
+       ( -- * Complilation
+         codeGenMaybeWorks
+       ) where
 
-import Control.Monad.Except (ExceptT, forM_, runExceptT, (>=>))
-import Control.Monad.State
+import Control.Monad.Except (forM_)
+import Control.Monad.State (gets, void)
 import Data.ByteString.Short (ShortByteString, toShort)
 import Data.Char (isUpper, ord)
 import Data.Map (Map)
@@ -283,9 +286,6 @@ modifiedCgenExpr x = cgenExpr x
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
-liftError :: ExceptT String IO a -> IO a
-liftError = runExceptT >=> either fail return
-
 codeGenMaybeWorks :: ShortByteString -> Rum.Program -> IO AST.Module
 codeGenMaybeWorks moduleName program = withContext $ \context ->
     withModuleFromAST context llvmAST $ \m -> do

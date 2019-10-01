@@ -1,34 +1,53 @@
-module Rum.Internal.Rumlude where
+module Rum.Internal.Rumlude
+       ( runRumlude
+       , writeRumlude
+
+       , rumludeFunNames
+       , rumludeFunArgs
+       ) where
 
 import Control.Monad.Trans (MonadIO, liftIO)
 import Data.Char (ord)
 import Data.List (intercalate)
 import Data.Monoid ((<>))
 
-import Rum.Internal.AST
-import Rum.StackMachine.Structure
+import Rum.Internal.AST (RumludeFunName (..), Type (..))
+import Rum.StackMachine.Structure (RumludeFunNamesMap)
 
 import qualified Data.HashMap.Strict as HM (HashMap, fromList)
 import qualified Data.Text as T
 
 
 rumludeFunNames :: RumludeFunNamesMap
-rumludeFunNames = HM.fromList [ ("read"  , Read ), ("write" , Write)
-                              , ("strlen", Strlen), ("strget", Strget)
-                              , ("strsub", Strsub), ("strdup", Strdup)
-                              , ("strset", Strset), ("strcat", Strcat)
-                              , ("strcmp", Strcmp), ("strmake", Strmake)
-                              , ("arrlen", Arrlen), ("arrmake", Arrmake)
-                              , ("Arrmake", Arrmake)
-                              ]
+rumludeFunNames = HM.fromList
+    [ ("read"  , Read )
+    , ("write" , Write)
+    , ("strlen", Strlen)
+    , ("strget", Strget)
+    , ("strsub", Strsub)
+    , ("strdup", Strdup)
+    , ("strset", Strset)
+    , ("strcat", Strcat)
+    , ("strcmp", Strcmp)
+    , ("strmake", Strmake)
+    , ("arrlen", Arrlen)
+    , ("arrmake", Arrmake)
+    , ("Arrmake", Arrmake)
+    ]
 
 rumludeFunArgs :: HM.HashMap RumludeFunName Int
-rumludeFunArgs = HM.fromList [ (Strlen, 1), (Strget, 2)
-                             , (Strsub, 3), (Strdup, 1)
-                             , (Strset, 3), (Strcat, 2)
-                             , (Strcmp, 2), (Strmake, 2)
-                             , (Arrlen, 1), (Arrmake, 2)
-                             ]
+rumludeFunArgs = HM.fromList
+    [ (Strlen, 1)
+    , (Strget, 2)
+    , (Strsub, 3)
+    , (Strdup, 1)
+    , (Strset, 3)
+    , (Strcat, 2)
+    , (Strcmp, 2)
+    , (Strmake, 2)
+    , (Arrlen, 1)
+    , (Arrmake, 2)
+    ]
 
 runRumlude :: RumludeFunName -> [Type] -> Type
 ----------------------

@@ -10,8 +10,8 @@ import Control.Applicative (empty)
 import Control.Monad.Trans (liftIO)
 import Text.Read (readMaybe)
 
-import Rum.Internal.AST
-import Rum.Internal.Rumlude
+import Rum.Internal.AST (FunEnv, InterpretT, RumludeFunName (..), Type (..))
+import Rum.Internal.Rumlude (runRumlude, writeRumlude)
 
 import qualified Data.HashMap.Strict as HM (fromList)
 

@@ -1,12 +1,15 @@
-module Rum.StackMachine.Translator where
+module Rum.StackMachine.Translator
+       ( translateP
+       ) where
 
 import Control.Monad.Extra (concatMapM)
 
-import Rum.Internal.AST
-import Rum.Internal.Rumlude
-import Rum.Internal.Util
-import Rum.StackMachine.Structure
-import Rum.StackMachine.Util
+import Rum.Internal.AST (ArrCell (..), BinOp (..), Expression (..), FunCall (..), Program,
+                         RumludeFunName (..), Statement (..), Type (..), Variable (..))
+import Rum.Internal.Rumlude (rumludeFunNames)
+import Rum.Internal.Util (isUp)
+import Rum.StackMachine.Structure (Instruction (..), Instructions, LabelId (..))
+import Rum.StackMachine.Util (newLabel)
 
 import qualified Data.HashMap.Strict as HM
 
@@ -61,7 +64,7 @@ translateStmt For{..} = do
 translateStmt Return{..} = translateExpr retExp >>= \ret -> pure $ ret ++ [SReturn]
 translateStmt Fun {..} = translate funBody >>= \f ->
     pure $ (Label $ LabelId $ varName funName) : map Store (reverse params) ++ f
-translateStmt (FunCallStmt f@FunCall{fName = "strset", args = [var@(Var v), i, c]}) = do
+translateStmt (FunCallStmt FunCall{fName = "strset", args = [var@(Var v), i, c]}) = do
     str <- translateExpr var
     ind <- translateExpr i
     ch <- translateExpr c

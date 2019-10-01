@@ -1,4 +1,6 @@
-module Rum.Internal.Parser where
+module Rum.Internal.Parser
+       ( progP
+       ) where
 
 
 import Control.Applicative (liftA2, (<|>))
@@ -10,7 +12,8 @@ import Text.Megaparsec (Parsec, anySingle, between, many, manyTill, notFollowedB
                         optional, sepBy, some, try)
 import Text.Megaparsec.Char (alphaNumChar, char, digitChar, letterChar, space, string)
 
-import Rum.Internal.AST
+import Rum.Internal.AST (ArrCell (..), BinOp (..), CompOp (..), Expression (..), FunCall (..),
+                         LogicOp (..), Program, Statement (..), Type (..), Variable (..))
 
 import qualified Data.Text as T
 

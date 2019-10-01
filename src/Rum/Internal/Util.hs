@@ -1,16 +1,41 @@
-module Rum.Internal.Util where
+module Rum.Internal.Util
+       ( evalRunInterpret
+       , runIOInterpret
+
+       , updateVars
+       , updateRefVars
+       , setRefArrsCell
+       , getArrsCell
+       , setArrsCell
+
+       , updateFuns
+       , updateBool
+
+       , findVar
+       , findRefVar
+       , findFun
+       , fromRefTypeToIO
+
+       , binOp
+       , logicOp
+       , intCompare
+       , isFalse
+       , isTrue
+       , isUp
+       ) where
 
 import Control.Monad ((>=>))
 import Control.Monad.State (evalStateT)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.Bool (bool)
 import Data.Char (isUpper)
-import Data.IORef
+import Data.IORef (IORef, readIORef, writeIORef)
 import Data.List (foldl')
 
-import Rum.Internal.AST
+import Rum.Internal.AST (BinOp (..), CompOp (..), Environment (..), Interpret (..), InterpretT,
+                         LogicOp (..), RefType (..), Type (..), Variable (..))
 
-import qualified Data.HashMap.Strict as HM (insert, lookup)
+import qualified Data.HashMap.Strict as HM (adjust, insert, lookup)
 import qualified Data.Text as T
 
 
@@ -41,10 +66,9 @@ setRefArrsCell (Number i:is) x rt = do
     setRefArrsCell is x (ar !! i)
 setRefArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
 
-updateArrs :: Variable -> [Type] -> Type -> Environment ->  Environment
+updateArrs :: Variable -> [Type] -> Type -> Environment -> Environment
 updateArrs v inds val env@Env{..} =
-    let Just arr = HM.lookup v varEnv in
-    env {varEnv = HM.insert v (Arr (setArrsCell inds val arr)) varEnv}
+    env {varEnv = HM.adjust (\arr -> Arr (setArrsCell inds val arr)) v varEnv}
 
 getArrsCell :: Type -> [Type] -> Type
 getArrsCell = foldl' (\(Arr a) (Number i) -> a !! i)

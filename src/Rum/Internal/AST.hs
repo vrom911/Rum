@@ -1,14 +1,33 @@
 -- Refactoring
 -- TODO: перейти на lens
 
-module Rum.Internal.AST where
+module Rum.Internal.AST
+       ( Type (..)
+       , BinOp (..)
+       , CompOp (..)
+       , LogicOp (..)
+       , Variable (..)
+       , ArrCell (..)
+       , FunCall (..)
+       , Expression (..)
+       , Statement (..)
+       , Program
+       , RumludeFunName (..)
+
+         -- * Environment
+       , Environment (..)
+       , Interpret (..)
+       , InterpretT
+       , RefType (..)
+       , FunEnv
+       ) where
 
 import Control.Applicative (Alternative)
 import Control.Monad.Fail (MonadFail)
 import Control.Monad.State (MonadIO, MonadState, StateT)
 import Control.Monad.Trans.Maybe (MaybeT)
 import Data.Hashable (Hashable)
-import Data.IORef
+import Data.IORef (IORef)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import GHC.Generics (Generic)
@@ -59,13 +78,13 @@ instance IsString Variable where
     fromString = Variable . T.pack
 
 data ArrCell = ArrCell
-    { arr   :: Variable
-    , index :: [Expression]
+    { arr   :: !Variable
+    , index :: ![Expression]
     } deriving stock (Show)
 
 data FunCall = FunCall
-    { fName :: Variable
-    , args  :: [Expression]
+    { fName :: !Variable
+    , args  :: ![Expression]
     } deriving stock (Show)
 
 data Expression
@@ -117,18 +136,24 @@ instance Hashable RumludeFunName
 -------------------------
 newtype Interpret a = Interpret
     { runInterpret :: StateT Environment (MaybeT IO) a
-    } deriving anyclass (Functor, Applicative, Monad, MonadIO, MonadFail, MonadState Environment, Alternative)
+    } deriving newtype ( Functor, Applicative, Monad, MonadIO
+                       , MonadFail, MonadState Environment
+                       , Alternative
+                       )
 
 type InterpretT = Interpret Type
 
 type VarEnv = HM.HashMap Variable Type
 type RefVarEnv = HM.HashMap Variable (IORef RefType)
-data RefType = Val Type | ArrayRef [IORef RefType]
 type FunEnv = HM.HashMap Variable ([Variable], [Type] -> InterpretT)
 
+data RefType
+    = Val Type
+    | ArrayRef [IORef RefType]
+
 data Environment = Env
-    { varEnv    :: VarEnv
-    , refVarEnv :: RefVarEnv
-    , funEnv    :: FunEnv
-    , isReturn  :: Bool
+    { varEnv    :: !VarEnv
+    , refVarEnv :: !RefVarEnv
+    , funEnv    :: !FunEnv
+    , isReturn  :: !Bool
     }

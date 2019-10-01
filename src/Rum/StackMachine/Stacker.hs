@@ -5,15 +5,18 @@ module Rum.StackMachine.Stacker
 import Control.Monad.State (evalState, evalStateT, execStateT, get, gets, liftIO, modify,
                             replicateM, unless, when)
 import Control.Monad.Trans.Reader (ask, asks, runReaderT)
-import Data.IORef
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
 import Text.Read (readMaybe)
 
-import Rum.Internal.Rumlude
-import Rum.Internal.Util
-import Rum.StackMachine.Structure
+import Rum.Internal.Rumlude (rumludeFunArgs, runRumlude, writeRumlude)
+import Rum.Internal.Util (binOp, intCompare, isFalse, isUp, logicOp)
+import Rum.StackMachine.Structure (Instruction (..), InterpretStack, SRefType (..),
+                                   StackEnvironment (..))
 import Rum.StackMachine.Translator (translateP)
-import Rum.StackMachine.Util
+import Rum.StackMachine.Util (buildLabelsMap, emptyVars, findLabel, findSVar, getSArrayCell,
+                              popNstack, popStack, pushStack, succPos, takePopStack, takeStack,
+                              updatePos, updateSArrs, updateSVars, updateSmallVars)
 
 import qualified Data.HashMap.Strict as HM (lookup)
 import qualified Rum.Internal.AST as AST
@@ -67,25 +70,25 @@ execute = do
         gets takeStack >>= \(AST.Number y) ->
             pop >> gets takeStack >>= \(AST.Number x) ->
                 pop >> push (AST.Number (logicOp l x y))
-    executeInstr (SCompOp c)  =
-        gets takeStack >>= \y ->
-            pop >> gets takeStack >>= \x ->
-                pop >> push (intCompare c x y)
+    executeInstr (SCompOp c)  = gets takeStack >>= \y ->
+        pop >> gets takeStack >>= \x ->
+            pop >> push (intCompare c x y)
     executeInstr (Load v) = gets (findSVar v) >>= \x -> case x of
         Val y    -> push y
         RefVal y -> liftIO (readIORef y) >>= push
     executeInstr (LoadRef v) = gets (findSVar v) >>= \x -> case x of
-            RefVal y -> liftIO (readIORef y) >>= push
-            Val y    -> push y
+        RefVal y -> liftIO (readIORef y) >>= push
+        Val y    -> push y
     executeInstr (Store v) =
-        if not (isUp v) then modify (updateSmallVars v) >> pop
-            else do
-                x <- gets $ head.stack
-                vs <- gets vars
-                case HM.lookup v vs of
-                    Just (RefVal m) -> liftIO $ writeIORef m x
-                    Nothing   -> liftIO (newIORef x) >>= \rx -> modify (updateSVars v (RefVal rx))
-                pop
+        if not (isUp v)
+        then modify (updateSmallVars v) >> pop
+        else do
+            x <- gets $ head.stack
+            vs <- gets vars
+            case HM.lookup v vs of
+                Just (RefVal m) -> liftIO $ writeIORef m x
+                Nothing   -> liftIO (newIORef x) >>= \rx -> modify (updateSVars v (RefVal rx))
+            pop
 
     executeInstr (Jump l)        = asks snd >>= \lbls -> modify (updatePos (findLabel l lbls))
     executeInstr (JumpIfFalse l) = gets takeStack >>= \s -> when (isFalse s) $ executeInstr (Jump l)
