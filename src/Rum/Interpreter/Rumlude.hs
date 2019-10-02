@@ -6,11 +6,7 @@ module Rum.Interpreter.Rumlude
        ( preludeLibrary
        ) where
 
-import Control.Applicative (empty)
-import Control.Monad.Trans (liftIO)
-import Text.Read (readMaybe)
-
-import Rum.Internal.AST (FunEnv, InterpretT, RumludeFunName (..), Type (..))
+import Rum.Internal.AST (FunEnv, InterpretT, RumType (..), RumludeFunName (..))
 import Rum.Internal.Rumlude (runRumlude, writeRumlude)
 
 import qualified Data.HashMap.Strict as HM (fromList)
@@ -37,15 +33,15 @@ preludeLibrary = HM.fromList
     , ("Arrmake", ([], interpretRumlude Arrmake))
     ]
   where
-    readFun :: [Type] -> InterpretT
-    readFun _ = liftIO getLine >>= \input -> maybe empty (pure . Number) (readMaybe input)
+    readFun :: [RumType] -> InterpretT
+    readFun _ = getLine >>= maybe empty (pure . Number) . readMaybe . toString
 
-    writeFun :: [Type] -> InterpretT
+    writeFun :: [RumType] -> InterpretT
     writeFun [x] = Unit <$ writeRumlude x
     writeFun _   = error "Paste Several arggs to write function"
 
     ----------------------
     -- String Functions --
     ----------------------
-    interpretRumlude :: RumludeFunName -> [Type] -> InterpretT
+    interpretRumlude :: RumludeFunName -> [RumType] -> InterpretT
     interpretRumlude f = pure . runRumlude f

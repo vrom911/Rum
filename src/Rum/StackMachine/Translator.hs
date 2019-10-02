@@ -3,9 +3,10 @@ module Rum.StackMachine.Translator
        ) where
 
 import Control.Monad.Extra (concatMapM)
+import Data.List (span)
 
 import Rum.Internal.AST (ArrCell (..), BinOp (..), Expression (..), FunCall (..), Program,
-                         RumludeFunName (..), Statement (..), Type (..), Variable (..))
+                         RumType (..), RumludeFunName (..), Statement (..), Variable (..))
 import Rum.Internal.Rumlude (rumludeFunNames)
 import Rum.Internal.Util (isUp)
 import Rum.StackMachine.Structure (Instruction (..), Instructions, LabelId (..))
@@ -73,7 +74,7 @@ translateStmt (FunCallStmt f) = translateFunCall f
 --translateStmt e = error $ "Not supported operation for stack: " ++ show e
 
 translateExpr :: Expression -> Instructions
-translateExpr (Const x)     = pure [Push x]
+translateExpr (ConstExp x) = pure [Push x]
 translateExpr (Var v)       = if isUp v then pure [LoadRef v] else pure [Load v]
 translateExpr (ArrC ArrCell{..}) = concatMapM translateExpr index >>= \indexes ->
     pure $ indexes ++ [LoadArr arr $ length indexes]

@@ -2,7 +2,7 @@
 -- TODO: перейти на lens
 
 module Rum.Internal.AST
-       ( Type (..)
+       ( RumType (..)
        , BinOp (..)
        , CompOp (..)
        , LogicOp (..)
@@ -22,25 +22,14 @@ module Rum.Internal.AST
        , FunEnv
        ) where
 
-import Control.Applicative (Alternative)
-import Control.Monad.Fail (MonadFail)
-import Control.Monad.State (MonadIO, MonadState, StateT)
-import Control.Monad.Trans.Maybe (MaybeT)
-import Data.Hashable (Hashable)
-import Data.IORef (IORef)
-import Data.String (IsString, fromString)
-import Data.Text (Text)
-import GHC.Generics (Generic)
-
-import qualified Data.HashMap.Strict as HM (HashMap)
 import qualified Data.Text as T (pack)
 
 
-data Type
+data RumType
     = Number Int
     | Ch Char
     | Str Text
-    | Arr [Type]
+    | Arr [RumType]
     | Unit
     deriving stock (Show, Eq, Ord)
 
@@ -75,7 +64,7 @@ newtype Variable = Variable
 instance Hashable Variable
 
 instance IsString Variable where
-    fromString = Variable . T.pack
+    fromString = Variable . toText
 
 data ArrCell = ArrCell
     { arr   :: !Variable
@@ -88,7 +77,7 @@ data FunCall = FunCall
     } deriving stock (Show)
 
 data Expression
-    = Const Type
+    = ConstExp RumType
     | Var   Variable
     | ArrC  ArrCell
     | ArrLit [Expression] -- for [ a, b, c ]
@@ -141,14 +130,14 @@ newtype Interpret a = Interpret
                        , Alternative
                        )
 
-type InterpretT = Interpret Type
+type InterpretT = Interpret RumType
 
-type VarEnv = HM.HashMap Variable Type
-type RefVarEnv = HM.HashMap Variable (IORef RefType)
-type FunEnv = HM.HashMap Variable ([Variable], [Type] -> InterpretT)
+type VarEnv    = HashMap Variable RumType
+type RefVarEnv = HashMap Variable (IORef RefType)
+type FunEnv    = HashMap Variable ([Variable], [RumType] -> InterpretT)
 
 data RefType
-    = Val Type
+    = Val RumType
     | ArrayRef [IORef RefType]
 
 data Environment = Env

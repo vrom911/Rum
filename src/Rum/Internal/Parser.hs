@@ -3,26 +3,20 @@ module Rum.Internal.Parser
        ) where
 
 
-import Control.Applicative (liftA2, (<|>))
 import Control.Monad.Combinators.Expr (Operator (..), makeExprParser)
-import Data.String (fromString)
-import Data.Text (Text)
-import Data.Void (Void)
-import Text.Megaparsec (Parsec, anySingle, between, many, manyTill, notFollowedBy, oneOf, option,
-                        optional, sepBy, some, try)
+import Text.Megaparsec (Parsec, anySingle, between, manyTill, notFollowedBy, oneOf, option,
+                        optional, sepBy, try)
 import Text.Megaparsec.Char (alphaNumChar, char, digitChar, letterChar, space, string)
 
 import Rum.Internal.AST (ArrCell (..), BinOp (..), CompOp (..), Expression (..), FunCall (..),
-                         LogicOp (..), Program, Statement (..), Type (..), Variable (..))
-
-import qualified Data.Text as T
+                         LogicOp (..), Program, RumType (..), Statement (..), Variable (..))
 
 
 -- | The parser
 type Parser = Parsec Void Text
 
 text :: String -> Parser Text
-text = string . T.pack
+text = string . toText
 
 txtSpace :: String -> Parser Text
 txtSpace s = text s >>= \x -> space >> return x
@@ -40,13 +34,13 @@ keyWords = [ "skip", "if", "then", "else", "fi", "repeat"
            ]
 
 numP :: Parser Int
-numP = (read <$> some digitChar) <* space
+numP = (fromMaybe (error "Parsing is crazy") . readMaybe <$> some digitChar) <* space
 
 charP :: Parser Char
 charP = between (char '\'') (char '\'') anySingle <* space
 
 txtP :: Parser Text
-txtP = T.pack <$> (char '"' *> anySingle `manyTill` char '"' <* space)
+txtP = toText <$> (char '"' *> anySingle `manyTill` char '"' <* space)
 
 boolP :: Parser Int
 boolP = (1 <$ text "true" <|> 0 <$ text "false") <* space
@@ -123,12 +117,12 @@ aOperators =
 
 basicExprP :: Parser Expression
 basicExprP =   parens arithmeticExprP
-           <|> Const . Number <$> numP
-           <|> Const . Ch     <$> charP
-           <|> Const . Str    <$> txtP
-           <|> Const . Number <$> boolP
-           <|> ArrLit         <$> (arrP <|> emptyArrP)
-           <|> varArrFuncallNameP
+    <|> ConstExp . Number <$> numP
+    <|> ConstExp . Ch     <$> charP
+    <|> ConstExp . Str    <$> txtP
+    <|> ConstExp . Number <$> boolP
+    <|> ArrLit            <$> (arrP <|> emptyArrP)
+    <|> varArrFuncallNameP
 
 arithmeticExprP, exprP :: Parser Expression
 arithmeticExprP = makeExprParser basicExprP aOperators
@@ -176,7 +170,7 @@ stmtP =   parens stmtP
     ifHelper = do
         cond  <- exprP
         true  <- keyword "then" *> progMainP
-        false <- try (keyword "elif" *> ((:[]) <$> ifHelper)) <|> option [Skip] (keyword "else" *> progMainP)
+        false <- try (keyword "elif" *> (one <$> ifHelper)) <|> option [Skip] (keyword "else" *> progMainP)
         return $ IfElse cond true false
 
     repeatP :: Parser Statement

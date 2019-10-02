@@ -2,11 +2,10 @@ module Rum.Internal.ToString
        ( progToStr
        ) where
 
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import Relude.Extra.Enum (next)
 
 import Rum.Internal.AST (ArrCell (..), BinOp (..), CompOp (..), Expression (..), FunCall (..),
-                         LogicOp (..), Program, Statement (..), Type (..), Variable (..))
+                         LogicOp (..), Program, RumType (..), Statement (..), Variable (..))
 
 import qualified Data.Text as T
 
@@ -24,29 +23,29 @@ stmtToStr :: Int -> Statement -> Text
 stmtToStr n AssignmentVar{..}  = tab n <> varName var <> " := " <> exprToStr value
 stmtToStr n AssignmentArr{..}  = tab n <> arrCellToStr arrC <> " := " <> exprToStr value
 stmtToStr n Skip            = tab n <> "skip "
-stmtToStr n IfElse{..}      = tab n <> "if"   <> tab (succ n) <> exprToStr ifCond <>
-                              tab n <> "then" <> progToStr (succ n) trueAct <>
-                              tab n <> "else" <> progToStr (succ n) falseAct <>
+stmtToStr n IfElse{..}      = tab n <> "if"   <> tab (next n) <> exprToStr ifCond <>
+                              tab n <> "then" <> progToStr (next n) trueAct <>
+                              tab n <> "else" <> progToStr (next n) falseAct <>
                               tab n <> "fi"
-stmtToStr n RepeatUntil{..} = tab n <> "repeat" <> progToStr (succ n) act <>
+stmtToStr n RepeatUntil{..} = tab n <> "repeat" <> progToStr (next n) act <>
                               tab n <> "until " <> exprToStr repCond
 stmtToStr n WhileDo{..}     = tab n <> "while " <> exprToStr whileCond <>
-                              tab n <> "do"     <> progToStr (succ n) act <>
+                              tab n <> "do"     <> progToStr (next n) act <>
                               tab n <> "od"
-stmtToStr n For{..}         = tab n <> "for " <> progToStr (succ n) start <>
-                                       ", "   <> tab (succ n) <> exprToStr expr <>
-                                       ", "   <> progToStr (succ n) update <>
-                              tab n <> "do"   <> progToStr (succ n) body <>
+stmtToStr n For{..}         = tab n <> "for " <> progToStr (next n) start <>
+                                       ", "   <> tab (next n) <> exprToStr expr <>
+                                       ", "   <> progToStr (next n) update <>
+                              tab n <> "do"   <> progToStr (next n) body <>
                               tab n <> "od"
 
 stmtToStr n Fun{..}         = tab n <> "fun " <> varName funName <> "(" <> expListStr (Var <$> params) <> ") begin" <>
-                              progToStr (succ n) funBody <>
+                              progToStr (next n) funBody <>
                               tab n <> "end"
 stmtToStr n Return{..}      = tab n <> "return " <> exprToStr retExp
 stmtToStr n (FunCallStmt f) = tab n <> funCallToStr f
 
 exprToStr :: Expression -> Text
-exprToStr (Const c)      = typeToStr c
+exprToStr (ConstExp c)   = typeToStr c
 exprToStr (ArrC arC)     = arrCellToStr arC
 exprToStr (ArrLit lits)  = "[" <> expListStr lits <> "]"
 exprToStr (Var v)        = varName v
@@ -62,9 +61,9 @@ arrCellToStr ArrCell{..} =  varName arr <> T.concat (map (\i -> "[" <> exprToStr
 funCallToStr :: FunCall -> Text
 funCallToStr FunCall{..}   = varName fName <> "(" <> expListStr args <> ")"
 
-typeToStr :: Type -> Text
-typeToStr (Number n) = T.pack $ show n
-typeToStr (Ch c)     = T.pack $ show c
+typeToStr :: RumType -> Text
+typeToStr (Number n) = show n
+typeToStr (Ch c)     = show c
 typeToStr (Str s)    = s
 typeToStr (Arr a)    = "[" <> T.intercalate ", " (map typeToStr a) <> "]"
 typeToStr Unit       = "()"
@@ -75,9 +74,9 @@ expListStr [x]        = exprToStr x
 expListStr (x1:x2:xs) = exprToStr x1 <> ", " <> expListStr (x2:xs)
 
 paren :: Expression -> Text
-paren e@(Const _) = exprToStr e
-paren e@(Var _)   = exprToStr e
-paren x           = "(" <> exprToStr x <> ")"
+paren e@(ConstExp _) = exprToStr e
+paren e@(Var _)      = exprToStr e
+paren x              = "(" <> exprToStr x <> ")"
 
 bToStr :: BinOp -> Text
 bToStr Add = " + "

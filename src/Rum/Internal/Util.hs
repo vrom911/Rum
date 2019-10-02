@@ -24,16 +24,13 @@ module Rum.Internal.Util
        , isUp
        ) where
 
-import Control.Monad ((>=>))
-import Control.Monad.State (evalStateT)
-import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
-import Data.Bool (bool)
+import Prelude hiding ((<&>))
+import Relude.Unsafe ((!!))
+
 import Data.Char (isUpper)
-import Data.IORef (IORef, readIORef, writeIORef)
-import Data.List (foldl')
 
 import Rum.Internal.AST (BinOp (..), CompOp (..), Environment (..), Interpret (..), InterpretT,
-                         LogicOp (..), RefType (..), Type (..), Variable (..))
+                         LogicOp (..), RefType (..), RumType (..), Variable (..))
 
 import qualified Data.HashMap.Strict as HM (adjust, insert, lookup)
 import qualified Data.Text as T
@@ -49,13 +46,13 @@ evalRunInterpret = evalStateT . runInterpret
 runIOInterpret :: Interpret a -> Environment -> IO ()
 runIOInterpret action env = () <$ runMaybeT (evalRunInterpret action env)
 
-updateVars :: Variable -> Type -> Environment ->  Environment
+updateVars :: Variable -> RumType -> Environment ->  Environment
 updateVars v val env@Env{..} = env {varEnv = HM.insert v val varEnv}
 
 updateRefVars :: Variable -> IORef RefType -> Environment -> Environment
 updateRefVars v val env@Env{..} = env {refVarEnv = HM.insert v val refVarEnv}
 
-setRefArrsCell :: [Type] -> Type -> IORef RefType -> IO ()
+setRefArrsCell :: [RumType] -> RumType -> IORef RefType -> IO ()
 setRefArrsCell [Number i] x rt = do
     Val (Arr ar) <- readIORef rt
     let (beg, _:rest) = splitAt i ar
@@ -64,36 +61,41 @@ setRefArrsCell [Number i] x rt = do
 setRefArrsCell (Number i:is) x rt = do
     ArrayRef ar <- readIORef rt
     setRefArrsCell is x (ar !! i)
-setRefArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
+setRefArrsCell ixs _ _ = error $ "called with wrong indices" <> show ixs
 
-updateArrs :: Variable -> [Type] -> Type -> Environment -> Environment
+updateArrs :: Variable -> [RumType] -> RumType -> Environment -> Environment
 updateArrs v inds val env@Env{..} =
     env {varEnv = HM.adjust (\arr -> Arr (setArrsCell inds val arr)) v varEnv}
 
-getArrsCell :: Type -> [Type] -> Type
+getArrsCell :: RumType -> [RumType] -> RumType
 getArrsCell = foldl' (\(Arr a) (Number i) -> a !! i)
 
-setArrsCell :: [Type] -> Type -> Type -> [Type]
+setArrsCell :: [RumType] -> RumType -> RumType -> [RumType]
 setArrsCell [Number i] x (Arr ar) =  let (beg, _:rest) = splitAt i ar in beg ++ (x:rest)
 setArrsCell (Number i:is) x (Arr ar) = let (beg, cur:rest) = splitAt i ar in beg ++ (Arr (setArrsCell is x cur):rest)
-setArrsCell ixs _ _ = error $ "called with wrong indices" ++ show ixs
+setArrsCell ixs _ _ = error $ "called with wrong indices" <> show ixs
 
-updateFuns :: Variable -> [Variable] -> ([Type] -> InterpretT) -> Environment -> Environment
+updateFuns
+    :: Variable
+    -> [Variable]
+    -> ([RumType] -> InterpretT)
+    -> Environment
+    -> Environment
 updateFuns name vars prog env@Env{..} = env {funEnv = HM.insert name (vars, prog) funEnv}
 
 updateBool :: Bool -> Environment -> Environment
 updateBool b env = env {isReturn = b}
 
-findVar :: Variable -> Environment -> Maybe Type
+findVar :: Variable -> Environment -> Maybe RumType
 findVar x Env{..} = HM.lookup x varEnv
 
 findRefVar :: Variable -> Environment -> Maybe (IORef RefType)
 findRefVar x Env{..} = HM.lookup x refVarEnv
 
-findFun :: Variable -> Environment -> Maybe ([Variable], [Type] -> InterpretT)
+findFun :: Variable -> Environment -> Maybe ([Variable], [RumType] -> InterpretT)
 findFun x Env{..} = HM.lookup x funEnv
 
-fromRefTypeToIO :: RefType -> IO Type
+fromRefTypeToIO :: RefType -> IO RumType
 fromRefTypeToIO (Val v)      = pure v
 fromRefTypeToIO (ArrayRef a) = Arr <$> mapM (readIORef >=> fromRefTypeToIO) a
 -------------------------
@@ -146,12 +148,13 @@ _ -|- _ = 1
 (-!-) :: Int -> Int -> Int
 (-!-) = (-|-)
 
-intCompare :: CompOp -> Type -> Type -> Type
+intCompare :: CompOp -> RumType -> RumType -> RumType
 intCompare c x y = Number $ bool 0 1 $ compOp c x y
 
-isFalse :: Type -> Bool
+isFalse :: RumType -> Bool
 isFalse s = Number 0 == s
-isTrue :: Type -> Bool
+
+isTrue :: RumType -> Bool
 isTrue = not . isFalse
 
 isUp :: Variable -> Bool

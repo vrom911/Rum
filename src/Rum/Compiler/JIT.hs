@@ -2,8 +2,6 @@ module Rum.Compiler.JIT
        ( runJit
        ) where
 
-import Control.Monad (void)
-import Control.Monad.Except (runExceptT)
 import Data.ByteString.Char8 (unpack)
 import Foreign.Ptr (FunPtr, castFunPtr)
 --import Foreign.C.Types (CInt (..))
@@ -32,10 +30,8 @@ runJit llvmMod =
                     writeFile "local_example.ll" $ unpack s
                     EE.withModuleInEngine executionEngine m $ \ee -> do
                         mainfn <- EE.getFunction ee (AST.Name "main")
-                        case mainfn of
-                            Just fn -> void $ run fn
+                        whenJust mainfn $ \fn -> void $ run fn
 --                                putStrLn $ "Evaluated to: " ++ show res
-                            Nothing -> return ()
                     pure optmod
 
 run :: FunPtr a -> IO Double

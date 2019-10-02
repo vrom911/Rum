@@ -12,15 +12,7 @@ module Rum.StackMachine.Structure
        , RumludeFunNamesMap
        ) where
 
-import Control.Monad.State (State, StateT)
-import Control.Monad.Trans.Reader (ReaderT)
-import Data.Hashable (Hashable)
-import Data.IORef (IORef)
-import Data.String (IsString, fromString)
-import Data.Text (Text)
-import GHC.Generics (Generic)
-
-import Rum.Internal.AST ( Type, RumludeFunName, Variable, LogicOp, BinOp, CompOp)
+import Rum.Internal.AST (RumType, RumludeFunName, Variable, LogicOp, BinOp, CompOp)
 
 import qualified Data.HashMap.Strict as HM
 import qualified Data.Text as T
@@ -33,7 +25,7 @@ newtype LabelId = LabelId
       deriving anyclass (Hashable)
 
 instance IsString LabelId where
-    fromString = LabelId . T.pack
+    fromString = LabelId . toText
 
 -- | Represents possible Rum's stack instruction.
 data Instruction
@@ -41,7 +33,7 @@ data Instruction
     | SBinOp BinOp
     | SLogicOp LogicOp
     | SCompOp CompOp
-    | Push Type   -- ^ Push a value onto the stack
+    | Push RumType   -- ^ Push a value onto the stack
     | Pop       -- ^ Pop the most recent value from the stack
     | Jump LabelId      -- ^ Jump unconditionally to a location
     | JumpIfTrue LabelId
@@ -60,12 +52,12 @@ data Instruction
 
 type Instructions = State Int [Instruction]
 type Labels = HM.HashMap LabelId Int
-type Stack = [Type]
+type Stack = [RumType]
 type RefSVarEnv = HM.HashMap Variable SRefType
 
 data SRefType
-    = Val Type
-    | RefVal (IORef Type)
+    = Val RumType
+    | RefVal (IORef RumType)
 
 data StackEnvironment = SEnv
     { vars  :: !RefSVarEnv
@@ -74,5 +66,5 @@ data StackEnvironment = SEnv
     }
 
 type InterpretStack = ReaderT ([Instruction], Labels) (StateT StackEnvironment IO) ()
-type InterpretStackType = ReaderT ([Instruction], Labels) (StateT StackEnvironment IO) Type
+type InterpretStackType = ReaderT ([Instruction], Labels) (StateT StackEnvironment IO) RumType
 type RumludeFunNamesMap = HM.HashMap Text RumludeFunName

@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Rum.Compiler.CodeGen
        ( LLVM (..)
        , runLLVM
@@ -30,8 +32,8 @@ module Rum.Compiler.CodeGen
        , getVar
 
          -- * References
-       , local
-       , global
+       , localRef
+       , globalRef
        , externf
 
          -- * Arithmetic operations and Constants
@@ -69,21 +71,16 @@ module Rum.Compiler.CodeGen
        , typeOfOperand
        ) where
 
-import Control.Monad.State (MonadState, State, execState, gets, modify, void)
+import Relude.Extra.Enum (next)
+
 import Data.ByteString.Short (ShortByteString, toShort)
 import Data.Char (ord)
 import Data.Function (on)
-import Data.List (map, sortBy)
-import Data.Map (Map)
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
-import GHC.Word (Word32)
+import Data.List (lookup)
 import LLVM.AST (BasicBlock (..), Definition (..), Instruction (..), Module (..), Name (..),
                  Named (..), Operand (..), Parameter (..), Terminator (..), defaultModule)
 
-import qualified Data.Map as Map (empty, insert, lookup, toList)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
+import qualified Data.Map.Strict as Map (empty, insert, lookup, toList)
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.CallingConvention as CC
@@ -91,7 +88,7 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Global as G (Global (..), functionDefaults, globalVariableDefaults)
 import qualified LLVM.AST.IntegerPredicate as I
 import qualified LLVM.AST.Linkage as L
-import qualified LLVM.AST.Type as Ty (Type (..), i32, i8)
+import qualified LLVM.AST.Type as Ty (Type (..), i32, i8, ptr)
 
 
 -----------------------
@@ -114,7 +111,7 @@ addDefn def = gets moduleDefinitions >>= \defs ->
 defineFun ::  AST.Type -> Text -> [(AST.Type, Name)] -> [BasicBlock] -> LLVM ()
 defineFun retType funName argTypes body = addDefn $
     GlobalDefinition $ G.functionDefaults
-    { G.name        = Name (toShort $ T.encodeUtf8 funName)
+    { G.name        = Name (toShort $ encodeUtf8 funName)
     , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], False)
     , G.returnType  = retType
     , G.basicBlocks = body
@@ -132,7 +129,7 @@ defineIOStrVariable varName formatString = addDefn $
 declareExtFun :: AST.Type -> Text -> [(AST.Type, Name)] -> Bool -> LLVM ()
 declareExtFun retType funName argTypes isVararg = addDefn $
     GlobalDefinition $ G.functionDefaults
-    { G.name        = Name (toShort $ T.encodeUtf8 funName)
+    { G.name        = Name (toShort $ encodeUtf8 funName)
     , G.linkage     = L.External
     , G.parameters  = ([Parameter parType nm [] | (parType, nm) <- argTypes], isVararg)
     , G.returnType  = retType
@@ -153,7 +150,7 @@ data CodegenState = CodegenState
     , blockCount   :: !Int                    -- ^ Count of basic blocks
     , count        :: !Word                   -- ^ Count of unnamed instructions
     , names        :: !Names                  -- ^ Name Supply
-    , varTypes     :: !(Map String Ty.Type)
+    , varTypes     :: !(Map String Ty.Type)   -- ^ Var name and Type pairs
     } deriving stock (Show)
 
 -- basic blocks inside of function definitions
@@ -174,6 +171,9 @@ newtype Codegen a = Codegen
 iType :: AST.Type
 iType = Ty.i32
 
+pointer :: AST.Type
+pointer = Ty.ptr Ty.i8
+
 iBits :: Word32
 iBits = 32
 
@@ -187,7 +187,7 @@ uniqueName :: ShortByteString -> Names -> (ShortByteString, Names)
 uniqueName nm ns = case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
     Just ix ->
-        (nm <> toShort (T.encodeUtf8 $ T.pack $ show ix)
+      (nm <> toShort (encodeUtf8 $ show @Text ix)
         , Map.insert nm (ix + 1) ns
         )
 
@@ -204,7 +204,7 @@ createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 makeBlock :: (Name, BlockState) -> BasicBlock
 makeBlock (l, BlockState _ s t) = BasicBlock l (reverse s) (makeTerm t)
   where
-    makeTerm = fromMaybe (error $ "Block has no terminator: " ++ show l)
+    makeTerm = fromMaybe (error $ "Block has no terminator: " <> show l)
 
 entryBlockName :: ShortByteString
 entryBlockName = "entry"
@@ -213,7 +213,15 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty Map.empty
+emptyCodegen = CodegenState
+    { currentBlock = Name entryBlockName
+    , blocks       = Map.empty
+    , symTable     = []
+    , blockCount   = 1
+    , count        = 0
+    , names        = Map.empty
+    , varTypes     = Map.empty
+    }
 
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
@@ -221,9 +229,9 @@ execCodegen m = execState (runCodegen m) emptyCodegen
 fresh :: Codegen Word
 fresh = do
     i <- gets count
-    let iNew = succ i
+    let iNew = next i
     modify $ \s -> s { count = iNew }
-    return iNew
+    pure iNew
 
 tyInstr :: Ty.Type -> Instruction -> Codegen Operand
 tyInstr t ins = do
@@ -232,7 +240,7 @@ tyInstr t ins = do
     blk <- current
     let i = stack blk
     modifyBlock (blk { stack = (ref := ins) : i } )
-    return $ local t ref
+    pure $ localRef t ref
 
 instr :: Instruction -> Codegen Operand
 instr = tyInstr iType
@@ -274,7 +282,7 @@ addBlock bname = do
     let n = Name qname
     modify $ \s -> s
         { blocks = Map.insert n new bls
-        , blockCount = succ ix
+        , blockCount = next ix
         , names = supply
         }
     pure n
@@ -291,7 +299,7 @@ modifyBlock new = getBlock >>= \active ->
 
 current :: Codegen BlockState
 current = getBlock >>= \c -> gets blocks >>= \blks ->
-    pure $ fromMaybe (error $ "No such block: " ++ show c) (Map.lookup c blks)
+    pure $ fromMaybe (error $ "No such block: " <> show c) (Map.lookup c blks)
 
 ----------------------------
 ------- Symbol Table -------
@@ -304,19 +312,19 @@ assign v x = gets symTable >>= \symbs -> gets varTypes >>= \varTps ->
 
 getVar :: String -> Codegen Operand
 getVar var = gets symTable >>= \syms ->
-    pure $ fromMaybe (error $ "Local variable not in scope: " ++ show var) (lookup var syms)
+    pure $ fromMaybe (error $ "Local variable not in scope: " <> show var) (lookup var syms)
 
 ----------------------------
 -------- References --------
 ----------------------------
-local :: Ty.Type -> Name -> Operand
-local = LocalReference
+localRef :: Ty.Type -> Name -> Operand
+localRef = LocalReference
 
-global ::  Ty.Type -> Name -> C.Constant
-global = C.GlobalReference
+globalRef ::  Ty.Type -> Name -> C.Constant
+globalRef = C.GlobalReference
 
 externf :: Ty.Type -> Name -> Operand
-externf ty = ConstantOperand . global ty
+externf ty = ConstantOperand . globalRef ty
 
 ----------------------------------
 ---- Arithmetic and Constants ----
@@ -376,7 +384,7 @@ isFalse :: Operand -> Codegen Operand
 isFalse = iCmp I.EQ iZero
 
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
-toArgs = map (\x -> (x, []))
+toArgs = map (, [])
 
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand

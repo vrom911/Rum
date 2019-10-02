@@ -4,10 +4,9 @@ module Rum.Compiler.Emitter
        ) where
 
 import Control.Monad.Except (forM_)
-import Control.Monad.State (gets, void)
 import Data.ByteString.Short (ShortByteString, toShort)
 import Data.Char (isUpper, ord)
-import Data.Map (Map)
+import Data.List (span)
 import LLVM.Context (withContext)
 import LLVM.Module (moduleLLVMAssembly, withModuleFromAST)
 
@@ -15,13 +14,11 @@ import Rum.Compiler.CodeGen (Codegen, CodegenState (..), LLVM, addBlock, alloca,
                              cbr, cons, createBlocks, declareExtFun, defineFun, emptyModule,
                              entryBlockName, execCodegen, externf, getElementPtr, getVar, iAdd,
                              iBits, iDiv, iEq, iGt, iLt, iMod, iMul, iNeq, iNotGt, iNotLt, iSub,
-                             iType, iZero, isFalse, isTrue, lAnd, lOr, load, local, ret, runLLVM,
+                             iType, iZero, isFalse, isTrue, lAnd, lOr, load, localRef, ret, runLLVM,
                              setBlock, store, typeOfOperand)
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.Map as Map (fromList, lookup)
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as T
 import qualified LLVM.AST as AST (Module (..), Name (..), Operand (..), Type (..))
 import qualified LLVM.AST.Constant as C (Constant (..))
 import qualified LLVM.AST.Type as Ty
@@ -30,10 +27,10 @@ import qualified Rum.Internal.AST as Rum
 
 
 toSig :: [Rum.Variable] -> [(AST.Type, AST.Name)]
-toSig = let nm = T.unpack . Rum.varName in
+toSig = let nm = toString . Rum.varName in
     map ( \x ->
-          ( if isUpper $ head (nm x) then Ty.ptr Ty.i8 else iType
-          , AST.Name (toShort $ T.encodeUtf8 $ Rum.varName x)
+          ( if isUpperHead (nm x) then Ty.ptr Ty.i8 else iType
+          , AST.Name (toShort $ encodeUtf8 $ Rum.varName x)
           )
         )
 
@@ -81,11 +78,13 @@ codeGenTop Rum.Fun{..} = defineFun iType (Rum.varName funName) fnargs bls
         entr <- addBlock entryBlockName
         setBlock entr
         forM_ params $ \a -> do
-            let aName = T.unpack $ Rum.varName a
+            let aName = toString $ Rum.varName a
 --            let aType = typeOfOperand a
-            let t = if isUpper $ head aName then Ty.ptr Ty.i8 else iType
+            let t = if isUpperHead aName
+                    then Ty.ptr Ty.i8
+                    else iType
             var <- alloca t
-            () <$ store var (local t (AST.Name $ toShort $ T.encodeUtf8 $ Rum.varName a))
+            () <$ store var (localRef t (AST.Name $ toShort $ encodeUtf8 $ Rum.varName a))
             assign aName var
         codeGenFunProg funBody >>= ret
 codeGenTop _ = error "Impossible happened in CodeGenTop. Only fun Declarations allowed!"
@@ -108,18 +107,18 @@ codeGenFunProg (s:stmts)          = codeGenStmt s >> codeGenFunProg stmts
 
 -- Main prog
 codeGenProg :: Rum.Program -> Codegen ()
-codeGenProg []                 = pure ()
-codeGenProg (Rum.Return{..}:_) = cgenExpr retExp >>= ret >> pure ()
+codeGenProg []                 = pass
+codeGenProg (Rum.Return{..}:_) = cgenExpr retExp >>= ret >> pass
 codeGenProg (s:stmts)          = codeGenStmt s >> codeGenProg stmts
 
 codeGenStmt :: Rum.Statement -> Codegen ()
-codeGenStmt Rum.Skip = return ()
-codeGenStmt Rum.Return{..} = cgenExpr retExp >>= ret >> return ()
+codeGenStmt Rum.Skip = pass
+codeGenStmt Rum.Return{..} = cgenExpr retExp >>= ret >> pass
 codeGenStmt Rum.AssignmentVar{..} = do
     cgenedVal <- cgenExpr value
     symTabl <- gets symTable
     let vars = map fst symTabl
-    let vName = T.unpack $ Rum.varName var
+    let vName = toString $ Rum.varName var
     if vName `elem` vars
     then do
         oldV <- getVar vName
@@ -128,8 +127,7 @@ codeGenStmt Rum.AssignmentVar{..} = do
         v <- alloca (typeOfOperand cgenedVal)
         () <$ store v cgenedVal
         assign vName v
-codeGenStmt (Rum.FunCallStmt f) =
-    void $ codeGenFunCall f
+codeGenStmt (Rum.FunCallStmt f) = void $ codeGenFunCall f
 codeGenStmt Rum.IfElse{..} = do
     ifTrueBlock <- addBlock "if.then"
     elseBlock   <- addBlock "if.else"
@@ -148,7 +146,7 @@ codeGenStmt Rum.IfElse{..} = do
     br ifExitBlock              -- Branch to the merge block
     -- if.exit
     setBlock ifExitBlock
-    return ()
+    pass
 codeGenStmt Rum.RepeatUntil{..} = do
     repeatBlock <- addBlock "repeat.loop"
     condBlock   <- addBlock "repeat.cond"
@@ -166,7 +164,7 @@ codeGenStmt Rum.RepeatUntil{..} = do
     cbr test repeatBlock exitBlock
     -- exit block
     setBlock exitBlock
-    return ()
+    pass
 codeGenStmt Rum.WhileDo{..} = do
     condBlock  <- addBlock "while.cond"
     whileBlock <- addBlock "while.loop"
@@ -184,7 +182,7 @@ codeGenStmt Rum.WhileDo{..} = do
     br condBlock
     -- Exit block
     setBlock exitBlock
-    return ()
+    pass
 codeGenStmt Rum.For{..} = do
     startBlock    <- addBlock "for.start"
     condBlock     <- addBlock "for.cond"
@@ -207,7 +205,7 @@ codeGenStmt Rum.For{..} = do
     br condBlock
     -- Exit block
     setBlock exitBlock
-    return ()
+    pass
 
 binOps :: Map Rum.BinOp (AST.Operand -> AST.Operand -> Codegen AST.Operand)
 binOps = Map.fromList
@@ -235,11 +233,11 @@ compOps = Map.fromList
     ]
 
 cgenExpr :: Rum.Expression -> Codegen AST.Operand
-cgenExpr (Rum.Const (Rum.Number c)) = pure $ cons (C.Int iBits (fromIntegral c))
-cgenExpr (Rum.Const (Rum.Ch c))     = pure $ cons (C.Int 8 (fromIntegral $ ord c))
-cgenExpr (Rum.Const (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
-                                    map (C.Int 8 . fromIntegral . ord) (T.unpack s) ++ [C.Int 8 0]
-cgenExpr (Rum.Var x) = let nm = T.unpack $ Rum.varName x in
+cgenExpr (Rum.ConstExp (Rum.Number c)) = pure $ cons (C.Int iBits (fromIntegral c))
+cgenExpr (Rum.ConstExp (Rum.Ch c))     = pure $ cons (C.Int 8 (fromIntegral $ ord c))
+cgenExpr (Rum.ConstExp (Rum.Str s))    = pure $ cons $ C.Array Ty.i8 $
+                                    map (C.Int 8 . fromIntegral . ord) (toString s) ++ [C.Int 8 0]
+cgenExpr (Rum.Var x) = let nm = toString $ Rum.varName x in
     getVar nm >>= \v ->
         gets varTypes >>= \tps -> case Map.lookup nm tps of
             Just Ty.ArrayType{..} -> getElementPtr v
@@ -271,14 +269,14 @@ rumFunNamesMap = Map.fromList [ ("write",  ("rumWrite", iType)),  ("read", ("rum
 
 codeGenFunCall :: Rum.FunCall -> Codegen AST.Operand
 codeGenFunCall Rum.FunCall{..} =
-    let funNm = T.unpack $ Rum.varName fName in
+    let funNm = toString $ Rum.varName fName in
     mapM modifiedCgenExpr args >>= \largs ->
             case Map.lookup funNm rumFunNamesMap of
                 Just (n, t) -> call (externf t (AST.Name $ toShort $ BS.pack n)) largs
                 Nothing     -> call (externf iType (AST.Name $ toShort $ BS.pack funNm)) largs
 
 modifiedCgenExpr :: Rum.Expression -> Codegen AST.Operand
-modifiedCgenExpr str@(Rum.Const (Rum.Str _)) = do
+modifiedCgenExpr str@(Rum.ConstExp (Rum.Str _)) = do
     codeGenStmt (Rum.AssignmentVar "T@" str)
     getVar "T@" >>= getElementPtr
 modifiedCgenExpr x = cgenExpr x
@@ -296,3 +294,9 @@ codeGenMaybeWorks moduleName program = withContext $ \context ->
     llvmModule    = emptyModule moduleName
     generatedLLVM = codegenProgram program
     llvmAST       = runLLVM llvmModule generatedLLVM
+
+
+isUpperHead :: String -> Bool
+isUpperHead xs = case viaNonEmpty head xs of
+    Just x  -> isUpper x
+    Nothing -> False

@@ -5,13 +5,9 @@ module Rum.Interpreter.Rummer
        ( rumInterpreter
        )where
 
-import Control.Applicative (empty, liftA2)
-import Control.Monad.State (MonadState, get, gets, lift, liftIO, modify)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-
 import Rum.Internal.AST (ArrCell (..), Environment (..), Expression (..), FunCall (..),
-                         Interpret (..), InterpretT, Program, RefType (..), RumludeFunName (..),
-                         Statement (..), Type (..), Variable (..))
+                         Interpret (..), InterpretT, Program, RefType (..), RumType (..),
+                         RumludeFunName (..), Statement (..), Variable (..))
 import Rum.Internal.Rumlude (runRumlude)
 import Rum.Internal.Util
 import Rum.Interpreter.Rumlude (preludeLibrary)
@@ -72,7 +68,7 @@ interpretSt (FunCallStmt f) = evalFunCall f
  empty :: StateT s (MaybeT IO) a = s -> IO Nothing
 -}
 eval :: Expression -> InterpretT
-eval (Const c)     = pure c
+eval (ConstExp c)     = pure c
 eval (Var v)       =
     if isUp v
     then do
@@ -86,8 +82,8 @@ eval (ArrC ArrCell{..}) = do
     var <- gets (findRefVar arr)
     case var of
         Just refvar -> liftIO $ readIORef refvar >>= fromRefTypeToIO >>= \x ->
-                return $ getArrsCell x inds
-        Nothing -> gets (findVar arr) >>= \v -> case v of
+            pure $ getArrsCell x inds
+        Nothing -> gets (findVar arr) >>= \case
             Just v  -> return $ getArrsCell v inds
             Nothing -> empty
 eval (ArrLit exps) = Arr <$> mapM eval exps
@@ -117,7 +113,7 @@ evalFunCall FunCall{fName = Variable "strset", args = [Var vS, i, c]} = do
     Val s <- liftIO $ readIORef valStr
     evI <- eval i
     evC <- eval c
-    interpretSt $ AssignmentVar vS (Const $ runRumlude Strset [s, evI, evC])
+    interpretSt $ AssignmentVar vS (ConstExp $ runRumlude Strset [s, evI, evC])
 evalFunCall FunCall{..} = do
     env <- get
     let funs = funEnv env
@@ -129,7 +125,12 @@ evalFunCall FunCall{..} = do
     let ref = HM.fromList refs
     Interpret $ lift $ evalRunInterpret (fun evalArgs) (Env locals {-`HM.union` globals-} ref funs False)
 
-temp :: [Variable] -> [Expression] -> [Type] -> Environment -> ([(Variable, Type)], [(Variable, IORef RefType)])
+temp
+    :: [Variable]
+    -> [Expression]
+    -> [RumType]
+    -> Environment
+    -> ([(Variable, RumType)], [(Variable, IORef RefType)])
 temp [] [] [] _ = (mempty, mempty)
 temp (v:vs) (e:es) (t:ts) env = case e of
     Var var -> let refVar = findRefVar var env in
@@ -152,8 +153,8 @@ evalVar v = do
 ---- Util ----
 --------------
 
-whenT :: (Applicative f) => Bool -> f Type -> f Type
+whenT :: (Applicative f) => Bool -> f RumType -> f RumType
 whenT cond s  = if cond then s else pure Unit
 
-modifyT :: MonadState s m => (s -> s) -> m Type
+modifyT :: MonadState s m => (s -> s) -> m RumType
 modifyT f = modify f >> pure Unit

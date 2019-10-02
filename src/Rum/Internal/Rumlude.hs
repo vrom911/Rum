@@ -6,12 +6,9 @@ module Rum.Internal.Rumlude
        , rumludeFunArgs
        ) where
 
-import Control.Monad.Trans (MonadIO, liftIO)
 import Data.Char (ord)
-import Data.List (intercalate)
-import Data.Monoid ((<>))
 
-import Rum.Internal.AST (RumludeFunName (..), Type (..))
+import Rum.Internal.AST (RumType (..), RumludeFunName (..))
 import Rum.StackMachine.Structure (RumludeFunNamesMap)
 
 import qualified Data.HashMap.Strict as HM (HashMap, fromList)
@@ -49,7 +46,7 @@ rumludeFunArgs = HM.fromList
     , (Arrmake, 2)
     ]
 
-runRumlude :: RumludeFunName -> [Type] -> Type
+runRumlude :: RumludeFunName -> [RumType] -> RumType
 ----------------------
 -- String Functions --
 ----------------------
@@ -65,7 +62,7 @@ runRumlude Strcmp [Str s, Str d] = Number $ case compare s d of
     EQ -> 0
     LT -> -1
     GT -> 1
-runRumlude Strmake [Number n, Ch ch] = Str $ T.replicate n (T.singleton ch)
+runRumlude Strmake [Number n, Ch ch] = Str $ T.replicate n (one ch)
 ----------------------
 -- Array Functions --
 ----------------------
@@ -75,14 +72,14 @@ runRumlude Arrmake [Number n, x] = Arr $ replicate n x
 runRumlude f args = error $ "Incorrect arguments in " <> show f <> "(" <> show args <> ")"
 
 
-typeToInt :: Type -> String
+typeToInt :: RumType -> String
 typeToInt (Number n) = show n
 typeToInt (Ch c)     = show $ ord c
-typeToInt (Str s)    = T.unpack s
+typeToInt (Str s)    = toString s
 typeToInt (Arr ar)   = "[" ++ intercalate ", " (map typeToInt ar) ++ "]"
 typeToInt Unit       = "()"
 
-writeRumlude :: MonadIO m => Type -> m ()
+writeRumlude :: MonadIO m => RumType -> m ()
 writeRumlude x =
 --    liftIO $ putStr "> > " -- for compiler-test/expressions
 --    liftIO $ putStr "> > > > "-- for compiler-test/deep-expressions

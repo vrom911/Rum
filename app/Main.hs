@@ -10,22 +10,24 @@ import Rum.Internal.ToString (progToStr)
 import Rum.Interpreter.Rummer (rumInterpreter)
 import Rum.StackMachine.Stacker (rumStacker)
 
-import qualified Data.Text.IO as TIO
-
 
 main :: IO ()
-main = do
-    progArgs@(opt:cmdArgs) <- getArgs
-    case opt of
-        "-it" -> run "prog.expr" test
-        "-i"  -> run (head cmdArgs) rumInterpreter
-        "-s"  -> run (head cmdArgs) rumStacker
-        "-c"  -> run (head cmdArgs) (rumCompiler $ head cmdArgs)
-        _     -> print progArgs
+main = getArgs >>= \case
+    [] -> putStrLn "Please specify an option"
+    progArgs@(opt:cmdArgs) ->
+        if opt == "-it"
+        then run "prog.expr" test
+        else case cmdArgs of
+            [] -> putStrLn "Incorrect options specified"
+            nm:_ -> case opt of
+                "-i" -> run nm rumInterpreter
+                "-s" -> run nm rumStacker
+                "-c" -> run nm (rumCompiler nm)
+                _    -> print progArgs
 
 run :: String -> ([Statement] -> IO ()) -> IO ()
 run fileName f = do
-    prog <- TIO.readFile fileName
+    prog <- readFileText fileName
     let statements = parse progP "" prog
     case statements of
         Left err -> error (show err)
@@ -35,4 +37,4 @@ test :: [Statement] -> IO ()
 test p = do
     print p
     rumInterpreter p
-    TIO.putStrLn $ progToStr 0 p
+    putTextLn $ progToStr 0 p

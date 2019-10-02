@@ -2,12 +2,7 @@ module Rum.StackMachine.Stacker
        ( rumStacker
        ) where
 
-import Control.Monad.State (evalState, evalStateT, execStateT, get, gets, liftIO, modify,
-                            replicateM, unless, when)
-import Control.Monad.Trans.Reader (ask, asks, runReaderT)
-import Data.IORef (newIORef, readIORef, writeIORef)
-import Data.Maybe (fromMaybe)
-import Text.Read (readMaybe)
+import Relude.Unsafe ((!!))
 
 import Rum.Internal.Rumlude (rumludeFunArgs, runRumlude, writeRumlude)
 import Rum.Internal.Util (binOp, intCompare, isFalse, isUp, logicOp)
@@ -50,8 +45,8 @@ execute = do
     isReturn _       = False
 
     executeInstr :: Instruction -> InterpretStack
-    executeInstr Nop        = return ()
-    executeInstr (Label _)  = return ()
+    executeInstr Nop        = pass
+    executeInstr (Label _)  = pass
     executeInstr (Push x)   = push x
     executeInstr Pop        = pop
     executeInstr (PushNArr n) = replicateM n takePopStack >>= \arr -> push (AST.Arr $ reverse arr)
@@ -73,27 +68,28 @@ execute = do
     executeInstr (SCompOp c)  = gets takeStack >>= \y ->
         pop >> gets takeStack >>= \x ->
             pop >> push (intCompare c x y)
-    executeInstr (Load v) = gets (findSVar v) >>= \x -> case x of
+    executeInstr (Load v) = gets (findSVar v) >>= \case
         Val y    -> push y
         RefVal y -> liftIO (readIORef y) >>= push
-    executeInstr (LoadRef v) = gets (findSVar v) >>= \x -> case x of
+    executeInstr (LoadRef v) = gets (findSVar v) >>= \case
         RefVal y -> liftIO (readIORef y) >>= push
         Val y    -> push y
     executeInstr (Store v) =
         if not (isUp v)
         then modify (updateSmallVars v) >> pop
         else do
-            x <- gets $ head.stack
-            vs <- gets vars
-            case HM.lookup v vs of
-                Just (RefVal m) -> liftIO $ writeIORef m x
-                Nothing   -> liftIO (newIORef x) >>= \rx -> modify (updateSVars v (RefVal rx))
-            pop
+            mx <- gets (viaNonEmpty head . stack)
+            whenJust mx $ \x -> do
+                vs <- gets vars
+                case HM.lookup v vs of
+                    Just (RefVal m) -> liftIO $ writeIORef m x
+                    Nothing   -> liftIO (newIORef x) >>= \rx -> modify (updateSVars v (RefVal rx))
+                pop
 
     executeInstr (Jump l)        = asks snd >>= \lbls -> modify (updatePos (findLabel l lbls))
     executeInstr (JumpIfFalse l) = gets takeStack >>= \s -> when (isFalse s) $ executeInstr (Jump l)
     executeInstr (JumpIfTrue l)  = gets takeStack >>= \s -> unless (isFalse s) $ executeInstr (Jump l)
-    executeInstr SReturn         = return ()
+    executeInstr SReturn         = pass
     executeInstr (SFunCall f n)  = ask >>= \(instrs, lbls) ->
         get >>= \SEnv{..} ->
            liftIO (execStateT  (runReaderT execute (instrs, lbls)) (SEnv emptyVars (take n stack) (findLabel f lbls))) >>=
@@ -103,12 +99,13 @@ execute = do
 
     executeRumlude :: AST.RumludeFunName -> InterpretStack
     executeRumlude AST.Read = liftIO getLine >>= \input ->
-        modify (pushStack $ AST.Number $ fromMaybe (error "Wrong input") (readMaybe input))
+        modify (pushStack $ AST.Number $ fromMaybe (error "Wrong input") (readMaybe $ toString input))
     executeRumlude AST.Write = takePopStack >>= writeRumlude
     executeRumlude f = replicateM (fromMaybe (error "Something gone wrong") (HM.lookup f rumludeFunArgs)) takePopStack >>=
         \args -> push (runRumlude f $ reverse args)
 
-    push :: AST.Type -> InterpretStack
+    push :: AST.RumType -> InterpretStack
     push = modify . pushStack
+
     pop :: InterpretStack
     pop = modify popStack

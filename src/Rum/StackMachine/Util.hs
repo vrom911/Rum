@@ -23,13 +23,11 @@ module Rum.StackMachine.Util
        , findLabel
        ) where
 
-import Control.Monad.State (State, get, gets, modify)
-import Data.IORef (readIORef, writeIORef)
-import Data.Maybe (fromMaybe)
-import Data.String (fromString)
+import Relude.Extra.Enum (next)
+
 import Safe (headMay)
 
-import Rum.Internal.AST (Type (..), Variable)
+import Rum.Internal.AST (RumType (..), Variable)
 import Rum.Internal.Util (getArrsCell, setArrsCell)
 import Rum.StackMachine.Structure (Instruction (..), InterpretStackType, LabelId, Labels,
                                    RefSVarEnv, SRefType (..), StackEnvironment (..))
@@ -40,11 +38,12 @@ import qualified Data.HashMap.Strict as HM (empty, fromList, insert, lookup)
 -----------------
 -- Environment --
 -----------------
-updateSmallVars :: Variable -> StackEnvironment ->  StackEnvironment
-updateSmallVars v sEnv@SEnv{..} =
-    sEnv{vars = HM.insert v (Val $ head stack) vars}
+updateSmallVars :: Variable -> StackEnvironment -> StackEnvironment
+updateSmallVars v sEnv@SEnv{..} = case viaNonEmpty head stack of
+    Just val -> sEnv {vars = HM.insert v (Val val) vars}
+    Nothing  -> sEnv
 
-updateSVars :: Variable -> SRefType -> StackEnvironment ->  StackEnvironment
+updateSVars :: Variable -> SRefType -> StackEnvironment -> StackEnvironment
 updateSVars v val sEnv@SEnv{..} =
     sEnv{vars = HM.insert v val vars}
 
@@ -56,12 +55,12 @@ findSVar x SEnv{..} = fromMaybe (error "Couldn't find variable") (HM.lookup x va
 --findSArrCell v inds senv = let fullArr = findSVar v senv in
 --    getSArrayCell fullArr inds
 
-getSArrayCell :: SRefType -> [Type] -> IO Type
+getSArrayCell :: SRefType -> [RumType] -> IO RumType
 getSArrayCell (RefVal x) ind = do
     rX <- readIORef x
     pure $ getArrsCell rX ind
 
-updateSArrs :: Variable -> [Type] -> Type -> StackEnvironment -> IO ()
+updateSArrs :: Variable -> [RumType] -> RumType -> StackEnvironment -> IO ()
 updateSArrs v inds val env@SEnv{..} = do
     let Just (RefVal arr) = HM.lookup v vars
     rArr <- readIORef arr
@@ -71,17 +70,17 @@ updatePos :: Int -> StackEnvironment -> StackEnvironment
 updatePos i sEnv@SEnv{..} = sEnv{pos = i}
 
 succPos :: StackEnvironment -> StackEnvironment
-succPos sEnv@SEnv{..} = sEnv {pos = succ pos}
+succPos sEnv@SEnv{..} = sEnv {pos = next pos}
 
-pushStack :: Type -> StackEnvironment -> StackEnvironment
+pushStack :: RumType -> StackEnvironment -> StackEnvironment
 pushStack el sEnv@SEnv{..} = sEnv{stack = el : stack}
 
 popStack :: StackEnvironment -> StackEnvironment
 popStack sEnv@SEnv{..} = case stack of
     [] -> error "Can not pop from empty stack"
-    _  -> sEnv{stack = tail stack}
+    _  -> sEnv{stack = drop 1 stack}
 
-takeStack :: StackEnvironment -> Type
+takeStack :: StackEnvironment -> RumType
 takeStack SEnv{..} = fromMaybe (error "Can not take from empty stack") (headMay stack)
 
 takePopStack :: InterpretStackType
@@ -92,6 +91,7 @@ popNstack n sEnv@SEnv{..} = sEnv{ stack = drop n stack }
 
 emptyVars :: RefSVarEnv
 emptyVars = HM.empty
+
 ---------------------
 --- Labels' stuff ---
 ---------------------
